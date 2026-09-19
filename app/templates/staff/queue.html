@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% from "partials/illustrations.html" import art_empty_menu %}
+{% block body_class %}has-panel{% endblock %}
+{% block title %}Кухня — {{ user.establishment.name if user.establishment else app_title }}{% endblock %}
+
+{% block content %}
+<div class="crew stack" id="crew" data-establishment="{{ user.establishment_id }}"
+     data-role="{{ user.role }}">
+
+  {# Шапка смены: где мы, кто на смене и что происходит прямо сейчас. #}
+  <header class="crew__head">
+    <div class="crew__where">
+      <span class="crew__mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none">
+          <path d="M22 21c-3.6 3.3-5.6 7.4-5.9 11.9" stroke="#FF4F32" stroke-width="3.6"
+                stroke-linecap="round"/>
+          <path d="M32 8c2.6 0 4.7 2 4.9 4.5 8.6 2.4 14.6 10.2 15 19.4H12.1c.4-9.2 6.4-17 15-19.4C27.3 10 29.4 8 32 8Z"
+                fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <circle cx="32" cy="7" r="3.4" fill="none" stroke="#1B1D21" stroke-width="3"/>
+          <path d="M7.5 35.5h49c0 2.4-2 4.3-4.4 4.3h-2.6c-.6 3.2-3.4 5.5-6.7 5.5H21.2c-3.3 0-6.1-2.3-6.7-5.5h-2.6c-2.4 0-4.4-1.9-4.4-4.3Z"
+                fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <path d="M14.5 45.3h35c-1 2.7-3.5 4.5-6.4 4.5H20.9c-2.9 0-5.4-1.8-6.4-4.5Z"
+                fill="#FF4F32" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <path d="M4 20h17" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+          <path d="M1.5 29.5h22" stroke="#1B1D21" stroke-width="5" stroke-linecap="round"/>
+          <path d="M4 39h15" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div>
+        <div class="crew__place" id="crew-place">
+          {{ user.establishment.name if user.establishment else 'Заведение' }}
+        </div>
+        <div class="crew__sub">
+          <span id="crew-address">{{ user.establishment.address if user.establishment else '' }}</span>
+          <span class="crew__dot" aria-hidden="true"></span>
+          <span id="crew-hours">
+            {%- if user.establishment -%}
+              {{ user.establishment.opens_at.strftime('%H:%M') }}–{{ user.establishment.closes_at.strftime('%H:%M') }}
+            {%- endif -%}
+          </span>
+          {# Роль видно сразу: администратор заведения или смена кухни. #}
+          <span class="badge {% if user.role == 'admin' %}badge--admin{% else %}badge--crew{% endif %}"
+                id="crew-role">
+            {{ 'Администратор' if user.role == 'admin' else 'Кухня' }}
+          </span>
+          <span class="muted">{{ user.username }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="crew__actions">
+      {# Сервер отдаёт всю активную очередь заведения: ночные брони относятся
+         к следующему дню, и фильтр по дате их бы спрятал. Поэтому здесь не
+         выбор дня, а подпись — контрол, который ничего не менял, убран. #}
+      <span class="crew__today" id="crew-today">
+        Смена на {{ today[8:10] }}.{{ today[5:7] }}.{{ today[0:4] }}
+      </span>
+      <button class="btn btn--line" type="button" id="crew-refresh">Обновить</button>
+      <a class="btn btn--line" href="#" id="crew-out">Завершить смену</a>
+    </div>
+
+    {# Вкладки: очередь, меню, настройки. Всё на одном экране, без переходов. #}
+    <nav class="crew__tabs" role="tablist" aria-label="Разделы панели">
+      <span class="crew__tabs-pill" id="crew-pill" aria-hidden="true"></span>
+      <button class="crew__tab is-on" type="button" role="tab" aria-selected="true"
+              data-panel="queue">Очередь</button>
+      <button class="crew__tab" type="button" role="tab" aria-selected="false"
+              data-panel="menu">Меню</button>
+      {# Настройки меняет только администратор заведения: ручка на бэкенде
+         защищена require_admin, поэтому кухне вкладку не показываем. #}
+      {% if user.role == 'admin' %}
+        <button class="crew__tab" type="button" role="tab" aria-selected="false"
+                data-panel="settings">Настройки</button>
+        <button class="crew__tab" type="button" role="tab" aria-selected="false"
+                data-panel="report">Аналитика</button>
+      {% endif %}
+    </nav>
+  </header>
+
+  {# ── Вкладка «Очередь» ─────────────────────────────────────────────────── #}
+  <section class="crew__panel is-on" data-panel="queue">
+    <div class="crew__board" id="orders">
+      <div class="skeleton skeleton--row"></div>
+      <div class="skeleton skeleton--row"></div>
+      <div class="skeleton skeleton--row"></div>
+    </div>
+  </section>
+
+  {# ── Вкладка «Меню»: список блюд с правкой на месте ────────────────────── #}
+  <section class="crew__panel" data-panel="menu" hidden>
+    <div class="crew__panel-head">
+      <h2>Меню заведения</h2>
+      <span class="muted small" id="menu-count"></span>
+    </div>
+    <div class="crew__menu" id="menu-body">
+      <div class="skeleton skeleton--row"></div>
+      <div class="skeleton skeleton--row"></div>
+    </div>
+
+    {# Правка меню — только администратор заведения: ручки на бэкенде
+       защищены require_admin. Кухня видит меню, но не меняет его. #}
+    {% if user.role == 'admin' %}
+    {# Форма правки: заполняется кликом по блюду. #}
+    <form class="panel crew__editor" id="dish-form" novalidate hidden>
+      <div class="crew__panel-head">
+        <h3 id="dish-title">Новое блюдо</h3>
+        <button class="link-btn link-btn--muted" type="button" id="dish-cancel">Отменить</button>
+      </div>
+      <input type="hidden" id="dish-id">
+      <div class="grid-2">
+        <div class="field">
+          <label for="dish-name">Название</label>
+          <input type="text" id="dish-name" maxlength="120" required>
+          <div class="field__error"></div>
+        </div>
+        <div class="field">
+          <label for="dish-cat">Раздел меню</label>
+          <input type="text" id="dish-cat" maxlength="60" list="dish-cats" placeholder="Основные блюда">
+          <datalist id="dish-cats"></datalist>
+          <div class="field__error"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="dish-desc">Описание <span class="muted">— что внутри</span></label>
+        <textarea id="dish-desc" rows="2" maxlength="240"
+                  placeholder="Курица, рис, овощи, соус терияки"></textarea>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="dish-price">Цена, ₸</label>
+          <input type="number" id="dish-price" min="0" step="50" required>
+          <div class="field__error"></div>
+        </div>
+        <div class="field">
+          <label for="dish-cooks">Готовить, минут</label>
+          <input type="number" id="dish-cooks" min="1" max="180" value="5" required>
+          <div class="field__error"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="dish-photo">Фото</label>
+        <div class="crew__photo-row">
+          <img class="crew__photo" id="dish-photo-preview" alt="" hidden>
+          <input type="text" id="dish-photo" placeholder="/static/img/menu/plov.jpg"
+                 autocomplete="off">
+        </div>
+        <div class="field__hint">
+          Путь к файлу в /static/img/menu. Оставьте пустым — карточка покажет заглушку.
+        </div>
+      </div>
+      <label class="crew__switch">
+        <input type="checkbox" id="dish-on" checked>
+        <span>Показывать гостям</span>
+      </label>
+      <div class="row" style="gap:10px;margin-top:14px">
+        <button class="btn btn--flame" type="submit" id="dish-save">Сохранить</button>
+        <button class="btn btn--line" type="button" id="dish-reset">Очистить</button>
+      </div>
+    </form>
+
+    <button class="btn btn--flame crew__add" type="button" id="dish-new">Добавить блюдо</button>
+    {% endif %}
+
+  </section>
+
+  {% if user.role == 'admin' %}
+    {# ── Вкладка «Настройки»: часы, вместимость, эталон для аналитики ────── #}
+    <section class="crew__panel" data-panel="settings" hidden>
+      <div class="crew__panel-head">
+        <h2>Настройки заведения</h2>
+        <span class="muted small">Вместимость применяется к будущим слотам</span>
+      </div>
+      <form class="panel" id="settings-form" novalidate>
+        <div class="grid-2">
+          <div class="field">
+            <label for="set-open">Открытие</label>
+            <input type="time" id="set-open" required>
+          </div>
+          <div class="field">
+            <label for="set-close">Закрытие</label>
+            <input type="time" id="set-close" required>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="set-step">Шаг слотов, минут</label>
+            <input type="number" id="set-step" min="5" max="60" step="5" required>
+          </div>
+          <div class="field">
+            <label for="set-capacity">Вместимость слота, порций</label>
+            <input type="number" id="set-capacity" min="1" max="50" required>
+            <div class="field__hint" id="capacity-note"></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="set-orders">Заказов в день до сервиса</label>
+            <input type="number" id="set-orders" min="1" max="5000" required>
+            <div class="field__hint">С этим числом сравниваем рост пропускной способности.</div>
+          </div>
+          <div class="field">
+            <label for="set-wait">Ожидание до сервиса, минут</label>
+            <input type="number" id="set-wait" min="1" max="240" required>
+            <div class="field__hint">Цель — 20 минут или меньше.</div>
+          </div>
+        </div>
+        <button class="btn btn--flame" type="submit" id="set-save">Сохранить настройки</button>
+      </form>
+
+      {# Профиль заведения: то, что видит гость в карточке. #}
+      <div class="crew__panel-head" style="margin-top:26px">
+        <h2>Профиль заведения</h2>
+        <span class="muted small">Это видят гости в списке заведений</span>
+      </div>
+      <form class="panel" id="profile-form" novalidate>
+        <div class="grid-2">
+          <div class="field">
+            <label for="profile-address">Адрес</label>
+            <input type="text" id="profile-address" maxlength="200" placeholder="ул. Абая, 15">
+          </div>
+          <div class="field">
+            <label for="profile-cuisine">Кухня</label>
+            <input type="text" id="profile-cuisine" maxlength="50" placeholder="Домашняя кухня">
+          </div>
+        </div>
+        <div class="field">
+          <label for="profile-photo">Фото</label>
+          <input type="text" id="profile-photo" maxlength="200"
+                 placeholder="/static/img/places/central.jpg">
+          <div class="field__hint">Путь к файлу в /static/img/places.</div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="profile-open">Открытие</label>
+            <input type="time" id="profile-open">
+          </div>
+          <div class="field">
+            <label for="profile-close">Закрытие</label>
+            <input type="time" id="profile-close">
+          </div>
+        </div>
+        <button class="btn btn--flame" type="submit" id="profile-save">Сохранить профиль</button>
+      </form>
+
+      {# Пароль кухни: администратор точки меняет его сам, без администратора сервиса. #}
+      <div class="crew__panel-head" style="margin-top:26px">
+        <h2>Доступ кухни</h2>
+        <span class="muted small">Пароль показывается один раз</span>
+      </div>
+      <div class="panel" id="kitchen-access">
+        <p class="muted small">
+          Смена входит под логином кухни. Если пароль потерян или ушёл сотрудник —
+          выдайте новый: прежний перестанет работать сразу.
+        </p>
+        <button class="btn btn--line" type="button" id="kitchen-password">
+          Сбросить пароль кухне
+        </button>
+        <div class="creds" id="kitchen-creds" hidden></div>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if user.role == 'admin' %}
+    {# ── Вкладка «Аналитика»: критерии успеха продукта ──────────────────── #}
+    <section class="crew__panel" data-panel="report" hidden>
+      <div class="crew__panel-head">
+        <h2>Аналитика заведения</h2>
+        <div class="segment segment--sm" role="group" aria-label="Период">
+          <label><input type="radio" name="period" value="day" checked><span>День</span></label>
+          <label><input type="radio" name="period" value="week"><span>Неделя</span></label>
+          <label><input type="radio" name="period" value="month"><span>Месяц</span></label>
+        </div>
+      </div>
+      <div class="report" id="report-body">
+        <div class="skeleton skeleton--card"></div>
+      </div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/staff_panel.js?v={{ static_version }}"></script>
+{% endblock %}

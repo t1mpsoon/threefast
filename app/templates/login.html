@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход для персонала — ThreeFast</title>
+  <link rel="icon" href="/static/img/mark.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/static/css/style.css?v={{ static_version }}">
+</head>
+<body>
+<div class="gate">
+  <div class="gate__box stack">
+    <a class="brand brand--lg" href="/" aria-label="ThreeFast — на главную">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none">
+          <path d="M22 21c-3.6 3.3-5.6 7.4-5.9 11.9" stroke="#FF4F32" stroke-width="3.6"
+                stroke-linecap="round"/>
+          <path d="M32 8c2.6 0 4.7 2 4.9 4.5 8.6 2.4 14.6 10.2 15 19.4H12.1c.4-9.2 6.4-17 15-19.4C27.3 10 29.4 8 32 8Z"
+                fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <circle cx="32" cy="7" r="3.4" fill="none" stroke="#1B1D21" stroke-width="3"/>
+          <path d="M7.5 35.5h49c0 2.4-2 4.3-4.4 4.3h-2.6c-.6 3.2-3.4 5.5-6.7 5.5H21.2c-3.3 0-6.1-2.3-6.7-5.5h-2.6c-2.4 0-4.4-1.9-4.4-4.3Z"
+                fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <path d="M14.5 45.3h35c-1 2.7-3.5 4.5-6.4 4.5H20.9c-2.9 0-5.4-1.8-6.4-4.5Z"
+                fill="#FF4F32" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <path d="M4 20h17" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+          <path d="M1.5 29.5h22" stroke="#1B1D21" stroke-width="5" stroke-linecap="round"/>
+          <path d="M4 39h15" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand__name">Three<span class="brand__accent">Fast</span></span>
+    </a>
+
+    <div class="panel">
+      <h1 style="font-size:1.4rem">Смена на кухне</h1>
+      <p class="muted small" style="margin-top:6px">
+        Здесь начинается рабочая смена: очередь заказов и настройки заведения.
+        Гостям вход не нужен — они заказывают без учётной записи.
+      </p>
+
+      <div id="notices" style="margin:14px 0"></div>
+
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="username">Логин</label>
+          <input type="text" id="username" autocomplete="username" required>
+          <div class="field__error"></div>
+        </div>
+        <div class="field">
+          <label for="password">Пароль</label>
+          <input type="password" id="password" autocomplete="current-password" required>
+          <div class="field__error"></div>
+        </div>
+        <button class="btn btn--flame btn--block" type="submit" id="login-button">Начать смену</button>
+      </form>
+
+      <p class="tiny muted" style="margin-top:14px">
+        Логины создаёт <code>python -m app.init_db</code> и печатает пароли один раз в консоль.
+        Забыли пароль — пересоздайте базу той же командой с ключом <code>--reset</code>.
+      </p>
+    </div>
+
+    <a class="btn btn--line btn--block" href="/">Вернуться к заказу еды</a>
+  </div>
+</div>
+
+<script src="/static/js/app.js?v={{ static_version }}"></script>
+<script>
+  (function () {
+    var form = document.getElementById('login-form');
+    var button = document.getElementById('login-button');
+    var nextUrl = {{ (next_url or '')|tojson }};
+
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      EP.clearNotices();
+      EP.cleanFields(form);
+
+      var username = document.getElementById('username').value.trim();
+      var password = document.getElementById('password').value;
+      var ok = true;
+      if (username.length < 3) { EP.badField('username', 'Логин короче трёх знаков'); ok = false; }
+      if (!password) { EP.badField('password', 'Введите пароль'); ok = false; }
+      if (!ok) return;
+
+      EP.busy(button, 'Проверяем', async function () {
+        try {
+          var who = await EP.apiFetch('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username: username, password: password })
+          });
+          EP.say('Смена открыта: ' + who.username + ', роль — ' + who.role_title.toLowerCase() + '.',
+                 'good', { sticky: true });
+          window.location.href = nextUrl || (who.can_manage_places ? '/super' : '/staff');
+        } catch (error) {
+          EP.say(error.status === 401
+            ? 'Логин или пароль не подошли. Проверьте раскладку и регистр.'
+            : error.message, 'bad', { title: 'Вход не выполнен' });
+        }
+      });
+    });
+  })();
+</script>
+</body>
+</html>

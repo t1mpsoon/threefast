@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% set tab = 'home' %}
+{% block body_class %}has-tabbar{% endblock %}
+{% from "partials/illustrations.html" import art_empty_menu %}
+{% block title %}{{ establishment.name }} — заказать к точной минуте{% endblock %}
+
+{% block content %}
+{# Баннер заведения: фото — главный якорь карточки. #}
+<div class="banner">
+  <img class="banner__photo" src="{{ establishment.photo or '' }}" alt="" width="1120" height="520">
+  <span class="banner__scrim"></span>
+  <div class="banner__info">
+    <div class="banner__name">{{ establishment.name }}</div>
+    <div class="banner__meta">
+      <span class="badge badge--glass">
+        {% include "partials/icon_star.html" %}{{ '%.1f'|format(establishment.rating or 0) }}
+      </span>
+      <span>{{ establishment.reviews_count }} оценок</span>
+      <span>{{ establishment.cuisine or 'Кафе' }}{% if establishment.address %} · {{ establishment.address }}{% endif %}</span>
+      <span>Работает {{ establishment.opens_at|slot_time }}–{{ establishment.closes_at|slot_time }}</span>
+    </div>
+  </div>
+</div>
+
+{% if not items %}
+  <div class="empty" style="margin-top:24px">
+    {{ art_empty_menu() }}
+    <h3>Меню пока пустое</h3>
+    <p>Заказывать нечего. Загляните позже или спросите на кассе, что готовят сегодня.</p>
+    <a class="btn btn--line" href="/" style="margin-top:14px">К другим заведениям</a>
+  </div>
+{% else %}
+  <div class="menu-cats">
+    <div class="chips" id="menu-cats" role="group" aria-label="Разделы меню">
+      {% for category in categories %}
+        <button class="chip" type="button" data-cat="{{ category }}"
+                aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ category }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Список блюд: сетка карточек с фото во всю ширину карточки. #}
+  <div id="menu-body">
+    {% for category in categories %}
+      <section class="section" data-section="{{ category }}" id="cat-{{ loop.index }}">
+        <h2 class="section__title">{{ category }}</h2>
+        <div class="dishes">
+          {% for item in items if (item.category or 'Прочее') == category %}
+            <article class="dish shine" data-dish="{{ item.id }}" data-name="{{ item.name }}"
+                     data-price="{{ item.price }}" data-cooks="{{ item.prep_time_minutes }}">
+              <div class="dish__media">
+                <img class="dish__photo" src="{{ item.photo or '' }}" alt="" loading="lazy"
+                     width="400" height="300">
+                {# Кнопка «+» наложена на правый нижний угол фото. #}
+                <div class="dish__side" data-side="{{ item.id }}"></div>
+              </div>
+              <div class="dish__body">
+                <div class="dish__name">{{ item.name }}</div>
+                {% if item.description %}<div class="dish__desc">{{ item.description }}</div>{% endif %}
+                <div class="dish__meta">
+                  <span class="dish__price">{{ item.price|money }}</span>
+                  <span class="dish__cooks">готовить {{ item.prep_time_minutes }} мин</span>
+                </div>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+  <p class="small muted" style="padding-bottom:120px" id="menu-note"></p>
+{% endif %}
+{% endblock %}
+
+{% block frame %}
+{{ super() }}
+
+{# Компактная шапка, которая выезжает при скролле. #}
+<div class="sticky-head" id="sticky-head">
+  <div class="sticky-head__row">
+    <img class="sticky-head__thumb" src="{{ establishment.photo or '' }}" alt="" width="76" height="76">
+    <div>
+      <div class="sticky-head__name">{{ establishment.name }}</div>
+      <div class="sticky-head__meta">
+        {% include "partials/icon_star.html" %}{{ '%.1f'|format(establishment.rating or 0) }}
+        · {{ establishment.address or establishment.cuisine or '' }}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if items %}
+  {# Плавающая панель корзины: появляется с первой позицией. #}
+  <div class="cartbar" id="cartbar">
+    <button class="cartbar__inner" type="button" id="cart-open">
+      <span class="cartbar__what">
+        <span class="cartbar__count" id="cart-count">1 позиция</span>
+        <span class="cartbar__sum" id="cart-sum">0 ₸</span>
+      </span>
+      <span class="cartbar__go">
+        <span class="cartbar__label">Продолжить</span>
+        <span class="cartbar__arrow" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M5 12h13M13 6.5 18.5 12 13 17.5" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </span>
+      <span class="sr-only">Открыть заказ и выбрать время</span>
+    </button>
+  </div>
+{% endif %}
+
+{% include "partials/sheet_time.html" %}
+{% include "partials/sheet_checkout.html" %}
+{% include "partials/tabbar.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.PLACE_ID = {{ establishment.id }};
+  window.PLACE_NAME = {{ establishment.name|tojson }};
+  window.TODAY = {{ today|tojson }};
+  window.MAX_DAYS = {{ max_days_ahead }};
+</script>
+<script src="/static/js/cart.js?v={{ static_version }}"></script>
+<script src="/static/js/sheet.js?v={{ static_version }}"></script>
+<script src="/static/js/sheet_time.js?v={{ static_version }}"></script>
+<script src="/static/js/sheet_checkout.js?v={{ static_version }}"></script>
+<script src="/static/js/menu.js?v={{ static_version }}"></script>
+{% endblock %}

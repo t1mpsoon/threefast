@@ -1,0 +1,30 @@
+{# Прогресс заказа: четыре сегмента с подписями, плавное заполнение.
+   tone управляет цветом всей шкалы: guest | active | done | lost. #}
+{% macro progress(status, step, tone='guest') %}
+  {% set stops = [('Принят', 1), ('Готовится', 2), ('Готово', 3), ('Выдано', 4)] %}
+  <div class="progress" data-progress data-status="{{ status }}" data-step="{{ step }}"
+       data-tone="{{ tone }}">
+    {% for name, index in stops %}
+      {% if step > 3 %}
+        {% set state = 'done' %}
+      {% elif step == 3 and index == 3 %}
+        {% set state = 'ready' %}
+      {% elif index < step %}
+        {% set state = 'done' %}
+      {% elif index == step %}
+        {% set state = 'current' %}
+      {% else %}
+        {% set state = '' %}
+      {% endif %}
+      <div class="progress__seg" data-stop="{{ index }}" data-state="{{ state }}">
+        <span class="progress__bar"><span class="progress__fill"></span></span>
+        <span class="progress__label">
+          {{ name }}
+          <svg class="progress__done-mark" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M4 10.5 8 15l8-9"/>
+          </svg>
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+{% endmacro %}

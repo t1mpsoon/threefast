@@ -1,0 +1,76 @@
+{# Шторка оформления: имя, телефон, оплата, сводка. Без регистрации и пароля. #}
+<div class="scrim" id="checkout-scrim" hidden></div>
+<section class="sheet" id="checkout-sheet" role="dialog" aria-modal="true"
+         aria-labelledby="checkout-title" hidden>
+  <div class="sheet__grip" data-drag><span></span></div>
+  <div class="sheet__head">
+    <div>
+      <h2 id="checkout-title">Оформление заказа</h2>
+      <p class="small muted" style="margin-top:4px" id="checkout-when">—</p>
+    </div>
+    <button class="sheet__close" type="button" data-close aria-label="Закрыть">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+
+  {# Три шага оформления: видно, что уже готово, а что осталось. #}
+  <ol class="steps" id="checkout-steps">
+    <li class="steps__item" data-step="items"><span class="steps__dot"></span>Состав</li>
+    <li class="steps__item" data-step="time"><span class="steps__dot"></span>Время</li>
+    <li class="steps__item" data-step="guest"><span class="steps__dot"></span>Контакты</li>
+  </ol>
+
+  <div class="sheet__body">
+    <form id="checkout-form" novalidate>
+      <div class="field">
+        <label for="guest-name">Как вас зовут</label>
+        <input type="text" id="guest-name" autocomplete="given-name" placeholder="Аружан" maxlength="100" required>
+        <div class="field__error"></div>
+      </div>
+      <div class="field">
+        <label for="guest-phone">Телефон</label>
+        <input type="tel" id="guest-phone" autocomplete="tel" placeholder="+7 701 123 45 67" required>
+        <div class="field__hint">Нужен, только если что-то пойдёт не так. Рассылок не делаем.</div>
+        <div class="field__error"></div>
+      </div>
+
+      <div class="field">
+        <span class="bold small" style="display:block;margin-bottom:6px">Оплата при получении</span>
+        <div class="segment" role="radiogroup" aria-label="Способ оплаты">
+          <label>
+            <input type="radio" name="payment_method" value="cash_on_pickup" checked>
+            <span>Наличными</span>
+          </label>
+          <label>
+            <input type="radio" name="payment_method" value="card_on_pickup">
+            <span>Картой</span>
+          </label>
+        </div>
+        <div class="field__hint">Платите на кассе, когда забираете заказ.</div>
+      </div>
+
+      <div class="field">
+        <label for="guest-note">Примечание к заказу <span class="muted">— необязательно</span></label>
+        <textarea id="guest-note" rows="2" maxlength="200"
+                  placeholder="Без лука, приборы на двоих, позвонить у входа"></textarea>
+        <div class="field__hint">
+          Кухня увидит примечание на своём экране.
+          <span id="note-count" class="muted"></span>
+        </div>
+        <div class="field__error"></div>
+      </div>
+
+      <h3 style="margin:18px 0 10px">Ваш заказ</h3>
+      <div class="summary" id="checkout-summary"></div>
+    </form>
+  </div>
+
+  <div class="sheet__foot">
+    <button class="btn btn--flame btn--block" type="submit" form="checkout-form" id="checkout-submit">
+      Оформить заказ · <span id="checkout-total">0 ₸</span>
+    </button>
+  </div>
+</section>

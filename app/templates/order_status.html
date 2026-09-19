@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% set tab = 'order' %}
+{% block body_class %}has-tabbar{% endblock %}
+{% from "partials/progress.html" import progress %}
+{% from "partials/illustrations.html" import art_no_order %}
+{% block title %}Мой заказ{% endblock %}
+
+{% block content %}
+{% if order and fresh %}
+  {# Экран успеха: галочка отрисовывается один раз, затем прогресс заказа. #}
+  <div class="success">
+    <div class="success__mark" aria-hidden="true">
+      <svg viewBox="0 0 52 52" fill="none">
+        <path class="check-path" d="M14 27.5 22.5 36 38 18"/>
+      </svg>
+    </div>
+    <h1>Заказ {{ order.order_code }} принят</h1>
+    <p class="muted" style="margin-top:8px">
+      {{ order.guest_name }}, кухня готовит к названной минуте.
+    </p>
+
+    <p class="muted small" style="margin-top:22px">Забрать в</p>
+    <div class="success__time">{{ order.slot.slot_datetime|slot_time }}</div>
+    <p class="success__place">
+      {{ order.establishment.name if order.establishment else '' }}{% if order.establishment and order.establishment.address %} · {{ order.establishment.address }}{% endif %}
+    </p>
+
+    {{ progress(order.status, 2, order.status_enum.tone) }}
+
+    <div class="stack" style="margin-top:22px">
+      <button class="share-btn" type="button" id="share-button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M12 3 7.5 7.5M12 3l4.5 4.5"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Поделиться заказом
+      </button>
+      <a class="btn btn--line btn--block" href="/">Заказать ещё</a>
+    </div>
+  </div>
+{% elif order %}
+  {% set step = {'confirmed': 1, 'in_progress': 2, 'ready': 3, 'picked_up': 4}.get(order.status, 0) %}
+  {# Тон статуса один на все экраны: цвет плашки и шкалы совпадает с кухней. #}
+  <div class="stack" id="order-card" data-code="{{ order.order_code }}"
+       data-tone="{{ order.status_enum.tone }}" style="padding-top:16px">
+    <div>
+      <h1>Заказ {{ order.order_code }}</h1>
+      <p class="muted" style="margin-top:6px" data-role="explain">
+        {{ order.status_enum.hint }}
+      </p>
+    </div>
+
+    <div class="panel">
+      <div class="row row--between" style="align-items:baseline">
+        <div>
+          <div class="muted small">Забрать в</div>
+          <div style="font-size:1.9rem;font-weight:800;letter-spacing:-0.03em"
+               data-role="minute">{{ order.slot.slot_datetime|slot_time }}</div>
+          <div class="muted small">{{ order.slot.slot_datetime|humanize_slot }}</div>
+        </div>
+        <span class="badge badge--{{ order.status_enum.tone }}" data-role="state">
+          {{ order.status_enum.title }}
+        </span>
+      </div>
+
+      <div style="margin-top:18px">
+        {{ progress(order.status, {'confirmed': 1, 'in_progress': 2, 'ready': 3, 'picked_up': 4}.get(order.status, 0), order.status_enum.tone) }}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-bottom:12px">Состав заказа</h3>
+      <div class="summary">
+        {% for item in order.items %}
+          <div class="summary__row">
+            <span>{{ item.item_name_snapshot }} <span class="summary__qty">×{{ item.quantity }}</span></span>
+            <span>{{ item.line_total|money }}</span>
+          </div>
+        {% endfor %}
+        <div class="summary__row summary__total">
+          <span>Итого</span><span>{{ order.total_amount|money }}</span>
+        </div>
+        <div class="summary__row small muted">
+          <span>Оплата</span><span>{{ order.payment_method_title or order.payment_status }}</span>
+        </div>
+        <div class="summary__row small muted">
+          <span>Заведение</span><span>{{ order.establishment.name if order.establishment else '' }}</span>
+        </div>
+      </div>
+
+      {% if order.note %}
+        <div class="note note--info" style="margin-top:14px">
+          <strong>Ваше примечание</strong>
+          <div>{{ order.note }}</div>
+        </div>
+      {% endif %}
+
+      {% if order.status in ('confirmed', 'in_progress') %}
+        <button class="btn btn--line btn--block" type="button" id="cancel-button" style="margin-top:14px">
+          Отменить заказ
+        </button>
+      {% endif %}
+    </div>
+
+    <button class="share-btn" type="button" id="share-button">Поделиться заказом</button>
+  </div>
+{% else %}
+  <div class="stack" style="padding-top:16px">
+    <div>
+      {% if error %}<div style="text-align:center">{{ art_no_order() }}</div>{% endif %}
+      <h1>{{ 'Заказ не найден' if error else 'Где мой заказ' }}</h1>
+      <p class="muted" style="margin-top:6px">
+        {% if error %}{{ error }}{% else %}Введите номер заказа, чтобы увидеть его статус.{% endif %}
+      </p>
+    </div>
+
+    <form class="panel" id="code-form" novalidate>
+      <div class="field">
+        <label for="code-input">Номер заказа</label>
+        <input type="text" id="code-input" placeholder="EX-3467" maxlength="10"
+               value="{{ code or '' }}" autocomplete="off" autocapitalize="characters"
+               style="text-transform:uppercase;font-weight:700">
+        <div class="field__hint">Номер показан на экране после оформления заказа.</div>
+        <div class="field__error"></div>
+      </div>
+      <button class="btn btn--flame btn--block" type="submit">Показать заказ</button>
+    </form>
+
+    <a class="btn btn--line btn--block" href="/">К заведениям</a>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.SHARE_TEXT = {{ share_text|tojson }};
+</script>
+<script src="/static/js/order_status.js?v={{ static_version }}"></script>
+{% endblock %}
+
+{% block frame %}
+{{ super() }}
+{% include "partials/tabbar.html" %}
+{% endblock %}

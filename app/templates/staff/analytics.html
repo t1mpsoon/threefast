@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Сводка смены — {{ establishment.name }}{% endblock %}
+
+{% block nav %}
+  <a href="/staff">Очередь</a>
+  <a href="/admin">Меню и слоты</a>
+  <a href="/admin/analytics" aria-current="page">Сводка</a>
+  <a href="#" id="analytics-out">Завершить смену</a>
+{% endblock %}
+
+{% block content %}
+<div class="stack" style="padding:16px 0 40px">
+  <div class="row row--between">
+    <div>
+      <h1>Сводка</h1>
+      <p class="muted small" style="margin-top:6px">
+        {{ report.date_from|day_ru }} — {{ report.date_to|day_ru }}.
+        Считаем время от названной минуты до фактической выдачи.
+      </p>
+    </div>
+    <div class="switch">
+      <a href="/admin/analytics?period=day" {% if period == 'day' %}aria-current="true"{% endif %}>День</a>
+      <a href="/admin/analytics?period=week" {% if period == 'week' %}aria-current="true"{% endif %}>Неделя</a>
+      <a href="/admin/analytics?period=month" {% if period == 'month' %}aria-current="true"{% endif %}>Месяц</a>
+    </div>
+  </div>
+
+  {% if report.message %}
+    <div class="panel" style="border-color:var(--amber)">
+      <strong>Пока нечего сравнивать.</strong>
+      <span class="muted">{{ report.message }} Как только выдадите первый заказ, цифры появятся здесь.</span>
+    </div>
+  {% endif %}
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel__head">
+        <h2>Сколько ждал гость</h2>
+        <span class="badge badge--free">цель — 2 минуты</span>
+      </div>
+      {% if report.average_wait_minutes is not none %}
+        <div class="meter__value">{{ '%.1f'|format(report.average_wait_minutes) }} мин</div>
+        <p class="muted small">
+          По {{ report.picked_up_count }} выданным заказам.
+          {% if report.wait_target_met %}Укладываемся в обещанные две минуты.
+          {% else %}Обещание было две минуты — обычно помогает снизить число заказов на минуту.{% endif %}
+        </p>
+        {% set base = report.baseline_wait_minutes or 20 %}
+        {% set share = (report.average_wait_minutes / base * 100)|round(0)|int %}
+        <div class="stack--tight" style="margin-top:14px">
+          <div class="row row--between small muted"><span>до системы</span><span>{{ base|round(0)|int }} мин</span></div>
+          <div class="bar"><span class="bar__fill" style="width:100%;background:var(--muted)"></span></div>
+          <div class="row row--between small muted"><span>сейчас</span><span>{{ '%.1f'|format(report.average_wait_minutes) }} мин</span></div>
+          <div class="bar">
+            <span class="bar__fill {{ 'bar__fill--ok' if report.wait_target_met else '' }}"
+                  style="width:{{ [share, 3]|max }}%"></span>
+          </div>
+        </div>
+      {% else %}
+        <div class="empty"><h3>Выданных заказов ещё нет</h3><p>Здесь появится среднее время ожидания.</p></div>
+      {% endif %}
+    </div>
+
+    <div class="panel">
+      <div class="panel__head">
+        <h2>Сколько успели</h2>
+        <span class="badge badge--free">ориентир +25%</span>
+      </div>
+      {% if report.throughput_growth_percent is not none %}
+        <div class="meter__value">{{ '%+.0f'|format(report.throughput_growth_percent) }}%</div>
+        <p class="muted small">
+          {{ report.orders_count }} заказов против {{ report.baseline_orders_count }} в день до системы.
+          {% if (report.throughput_growth_percent or 0) >= 25 %}Прирост выше четверти — это ориентир кейса.
+          {% else %}Прибавку даёт вместимость на минуту, а не скорость готовки.{% endif %}
+        </p>
+      {% else %}
+        <div class="empty">
+          <h3>Не с чем сравнивать</h3>
+          <p>Впишите прежний объём на странице <a href="/admin">Меню и слоты</a>.</p>
+        </div>
+      {% endif %}
+
+      <div class="summary" style="margin-top:16px">
+        <div class="summary__row"><span>Заказов за период</span><span>{{ report.orders_count }}</span></div>
+        <div class="summary__row"><span>Выдано</span><span>{{ report.picked_up_count }}</span></div>
+        <div class="summary__row"><span>Не забрали или отменили</span><span>{{ report.lost_orders_count }}</span></div>
+        <div class="summary__row"><span>Потолок кухни</span><span>{{ report.capacity_per_hour }} в час</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel__head">
+      <h2>Заказы по часам</h2>
+      <span class="muted small">сегодня</span>
+    </div>
+    {% if hourly_load %}
+      {% set peak = hourly_load|map(attribute=1)|max %}
+      <div class="stack--tight">
+        {% for hour, count in hourly_load %}
+          <div class="row" style="gap:12px">
+            <span class="muted small num" style="min-width:3.6em">{{ hour }}</span>
+            <span class="bar" style="flex:1 1 auto">
+              <span class="bar__fill" style="width:{{ (count / (peak or 1) * 100)|round(0)|int }}%"></span>
+            </span>
+            <span class="muted small num">{{ count }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      <p class="muted small" style="margin-top:12px">
+        Ровные полосы — хорошо: гости расходятся по времени, а не стоят в одну смену.
+      </p>
+    {% else %}
+      <div class="empty"><h3>Сегодня заказов не было</h3><p>Распределение появится, когда пойдут заказы.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var out = document.getElementById('analytics-out');
+    if (!out) return;
+    out.addEventListener('click', async function (event) {
+      event.preventDefault();
+      try { await EP.apiFetch('/api/auth/logout', { method: 'POST' }); } catch (_) { /* ignore */ }
+      window.location.href = '/login';
+    });
+  })();
+</script>
+{% endblock %}

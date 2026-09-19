@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}{{ app_title }}{% endblock %}</title>
+  <meta name="theme-color" content="#FF4F32">
+  <link rel="icon" href="/static/img/mark.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/static/css/style.css?v={{ static_version }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<script>
+  /* Оформление ставим до первой отрисовки: иначе светлая тема мигнёт. */
+  (function () {
+    try {
+      var saved = localStorage.getItem('ep-shift');
+      if (saved === 'dark' || saved === 'light') {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    } catch (_) { /* приватный режим */ }
+  })();
+</script>
+{# Одно мягкое свечение сверху: фон не белый, но и не перегруженный. #}
+<div class="page-glow" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="shell top__row">
+    <a class="brand" href="/" aria-label="{{ app_title }} — на главную">
+      {# Логотип: купол на скорости, три полосы как в фирменном знаке. #}
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none">
+          <path d="M22 21c-3.6 3.3-5.6 7.4-5.9 11.9" stroke="#FF4F32" stroke-width="3.6"
+                stroke-linecap="round"/>
+          <path d="M32 8c2.6 0 4.7 2 4.9 4.5 8.6 2.4 14.6 10.2 15 19.4H12.1c.4-9.2 6.4-17 15-19.4C27.3 10 29.4 8 32 8Z"
+                fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <circle cx="32" cy="7" r="3.4" fill="none" stroke="#1B1D21" stroke-width="3"/>
+          <path d="M7.5 35.5h49c0 2.4-2 4.3-4.4 4.3h-2.6c-.6 3.2-3.4 5.5-6.7 5.5H21.2c-3.3 0-6.1-2.3-6.7-5.5h-2.6c-2.4 0-4.4-1.9-4.4-4.3Z"
+                fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <path d="M14.5 45.3h35c-1 2.7-3.5 4.5-6.4 4.5H20.9c-2.9 0-5.4-1.8-6.4-4.5Z"
+                fill="#FF4F32" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <path d="M4 20h17" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+          <path d="M1.5 29.5h22" stroke="#1B1D21" stroke-width="5" stroke-linecap="round"/>
+          <path d="M4 39h15" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand__name">Three<span class="brand__accent">Fast</span></span>
+    </a>
+    <span class="top__gap"></span>
+    <nav class="top__nav" aria-label="Разделы">
+      {% block nav %}
+        <a href="/" {% if request.url.path == '/' %}aria-current="page"{% endif %}>
+          {% include "partials/icon_home.html" %}Заведения
+        </a>
+        <a href="/order" {% if request.url.path == '/order' %}aria-current="page"{% endif %}>Мой заказ</a>
+        {% if is_authenticated %}
+          <a href="/staff">Смена</a>
+        {% else %}
+          <a href="/login">Для персонала</a>
+        {% endif %}
+      {% endblock %}
+    </nav>
+    {# Оформление: светлое или тёмное. Выбор запоминается в браузере. #}
+    <button class="shift shift-toggle" type="button" id="shift-toggle"
+          aria-label="Переключить оформление">
+      <span class="shift__icon" aria-hidden="true">
+        <svg class="shift__sun" width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <svg class="shift__moon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2Z"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+  </div>
+</header>
+
+{% block frame %}
+<main class="shell">
+  {% block content %}{% endblock %}
+</main>
+{% include "partials/footer.html" %}
+{% endblock %}
+
+{# Возврат к началу страницы: появляется после прокрутки, есть на всех
+   экранах — и в меню, и в панели кухни, где очередь длинная. #}
+<button class="to-top" type="button" id="to-top" hidden aria-label="Наверх, к началу страницы">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M12 19V5M12 5l-6 6M12 5l6 6" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</button>
+
+<div class="notices" id="notices" role="status" aria-live="polite"></div>
+
+<script src="/static/js/sound.js?v={{ static_version }}"></script>
+<script src="/static/js/app.js?v={{ static_version }}"></script>
+<script>
+  /* Переход между разделами: старая страница уезжает, новая приходит.
+     Прогрессивное улучшение — работает в браузерах с View Transitions API. */
+  (function () {
+    if (!document.startViewTransition) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.documentElement.classList.add('has-view-transitions');
+  })();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

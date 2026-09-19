@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Не получилось — {{ status_code }}{% endblock %}
+
+{% block content %}
+<div class="stack" style="padding:40px 0">
+  <div>
+    <h1>{{ message }}</h1>
+    <p class="muted" style="margin-top:8px">
+      {% if status_code == 404 %}
+        Такой страницы нет. Возможно, ссылка устарела или в номере заказа опечатка.
+      {% elif status_code == 403 %}
+        Это служебный раздел для сотрудников кафе. Гостям он не нужен: заказывать можно без входа.
+      {% elif status_code == 401 %}
+        Смена закрыта. Войдите заново, чтобы увидеть очередь заказов.
+      {% elif status_code >= 500 %}
+        Мы записали ошибку в журнал и посмотрим, что сломалось. Попробуйте обновить страницу.
+      {% else %}
+        Запрос не подошёл. Проверьте данные и попробуйте ещё раз.
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="row">
+    <a class="btn btn--flame" href="/">К заведениям</a>
+    <a class="btn btn--line" href="/order">Проверить заказ</a>
+  </div>
+</div>
+{% endblock %}

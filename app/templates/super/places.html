@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block body_class %}has-panel{% endblock %}
+{% block title %}Заведения сервиса — {{ app_title }}{% endblock %}
+
+{% block nav %}
+  <a href="/super" aria-current="page">Заведения</a>
+  <a href="/staff">Смена</a>
+  <a href="#" id="crew-out">Выйти</a>
+{% endblock %}
+
+{% block content %}
+<div class="ops stack" id="ops">
+  <header class="ops__head">
+    <div>
+      <h1>Заведения сервиса</h1>
+      <p class="muted small" style="margin-top:6px">
+        Здесь заводят новые точки и выдают им доступ в панель.
+        Пароль показывается один раз — в базе хранится только его хеш.
+      </p>
+    </div>
+    <div class="ops__actions">
+      <span class="muted small" id="ops-count"></span>
+      <button class="btn btn--flame" type="button" id="place-new">Добавить заведение</button>
+      <a class="btn btn--line" href="#" id="crew-out-2">Выйти</a>
+    </div>
+  </header>
+
+  {# Сводка по всей платформе: заказы, ожидание, активность заведений. #}
+  <section class="stats-platform" id="platform-stats" aria-live="polite">
+    <div class="plat">
+      <span class="plat__label">Заказов сегодня</span>
+      <span class="plat__value" id="plat-orders">—</span>
+      <span class="plat__note" id="plat-orders-note"></span>
+    </div>
+    <div class="plat">
+      <span class="plat__label">Среднее ожидание</span>
+      <span class="plat__value" id="plat-wait">—</span>
+      <span class="plat__note" id="plat-wait-note">цель — 2 минуты</span>
+    </div>
+    <div class="plat">
+      <span class="plat__label">Заведений принимают заказы</span>
+      <span class="plat__value" id="plat-active">—</span>
+      <span class="plat__note" id="plat-active-note"></span>
+    </div>
+    <div class="plat">
+      <span class="plat__label">Выручка за день</span>
+      <span class="plat__value" id="plat-revenue">—</span>
+      <span class="plat__note" id="plat-revenue-note"></span>
+    </div>
+  </section>
+
+  {# Доступ, который нужно сохранить: показывается один раз после создания. #}
+  <div class="creds" id="creds" hidden></div>
+
+  <div class="ops__grid" id="places-admin">
+    <div class="skeleton skeleton--card"></div>
+    <div class="skeleton skeleton--card"></div>
+  </div>
+
+  {# Форма заведения: создание и правка в одном месте. #}
+  <form class="panel ops__form" id="place-form" hidden novalidate>
+    <div class="ops__form-head">
+      <h2 id="place-form-title">Новое заведение</h2>
+      <button class="link-btn link-btn--muted" type="button" id="place-cancel">Отменить</button>
+    </div>
+    <input type="hidden" id="place-id">
+
+    <div class="grid-2">
+      <div class="field">
+        <label for="place-name">Название</label>
+        <input type="text" id="place-name" maxlength="100" required placeholder="Кафе у дома">
+        <div class="field__error"></div>
+      </div>
+      <div class="field">
+        <label for="place-address">Адрес</label>
+        <input type="text" id="place-address" maxlength="200" placeholder="ул. Абая, 15">
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="field">
+        <label for="place-cuisine">Кухня</label>
+        <input type="text" id="place-cuisine" maxlength="50" list="cuisine-list"
+               placeholder="Домашняя кухня">
+        <datalist id="cuisine-list"></datalist>
+      </div>
+      <div class="field">
+        <label for="place-photo">Фото</label>
+        <input type="text" id="place-photo" maxlength="200"
+               placeholder="/static/img/places/central.jpg">
+        <div class="field__hint">Путь к файлу в /static/img/places.</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="field">
+        <label for="place-open">Открытие</label>
+        <input type="time" id="place-open" value="09:00" required>
+      </div>
+      <div class="field">
+        <label for="place-close">Закрытие</label>
+        <input type="time" id="place-close" value="21:00" required>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div class="field">
+        <label for="place-step">Шаг слотов, минут</label>
+        <input type="number" id="place-step" min="5" max="60" step="5" value="5" required>
+      </div>
+      <div class="field">
+        <label for="place-capacity">Порций в слоте</label>
+        <input type="number" id="place-capacity" min="1" max="50" value="3" required>
+        <div class="field__hint" id="place-capacity-note"></div>
+      </div>
+      <div class="field">
+        <label for="place-rating">Рейтинг</label>
+        <input type="number" id="place-rating" min="0" max="5" step="0.1" value="4.8">
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="field">
+        <label for="place-baseline-orders">Заказов в день до сервиса</label>
+        <input type="number" id="place-baseline-orders" min="0" max="5000" value="35">
+        <div class="field__hint">С этим числом сравниваем рост пропускной способности.</div>
+      </div>
+      <div class="field">
+        <label for="place-baseline-wait">Ожидание до сервиса, минут</label>
+        <input type="number" id="place-baseline-wait" min="1" max="240" value="20">
+      </div>
+    </div>
+
+    <div class="field" id="place-password-field">
+      <label for="place-password">Пароль для смены <span class="muted">— необязательно</span></label>
+      <input type="text" id="place-password" minlength="8" maxlength="72"
+             placeholder="Оставьте пустым — сгенерируем">
+      <div class="field__hint">Один пароль на администратора точки и на кухню.</div>
+    </div>
+
+    <button class="btn btn--flame" type="submit" id="place-save">Создать заведение</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/super_admin.js?v={{ static_version }}"></script>
+{% endblock %}

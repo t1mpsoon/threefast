@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set tab = 'home' %}
+{% block title %}Забрать еду к точной минуте — {{ app_title }}{% endblock %}
+{% block body_class %}has-tabbar{% endblock %}
+
+{% block content %}
+{# Адрес конкретного кафе показываем в его карточке: у точек он разный,
+   а общая строка в шапке только путала. Здесь остаётся время. #}
+<div class="address enter">
+  <span class="address__pin" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="12" cy="10" r="2.6" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
+  <div>
+    <div class="address__label">Заказ забираете сами</div>
+    <div class="address__value">Адрес — в карточке кафе</div>
+  </div>
+  <span class="address__live" id="live-clock">--:--</span>
+</div>
+
+{# Поиск: и заведение, и блюдо, и улица. Фильтрует на клиенте, без запросов. #}
+<div class="search enter" style="animation-delay:40ms">
+  <span class="search__icon">{% include "partials/icon_search.html" %}</span>
+  <label class="sr-only" for="place-search">Поиск заведения или блюда</label>
+  <input type="search" id="place-search" autocomplete="off"
+         placeholder="Заведение, улица или блюдо">
+  <button class="search__clear" type="button" id="search-clear" hidden
+          aria-label="Очистить поиск">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</div>
+
+{# Баннер: несколько слайдов, которые сменяются сами и по свайпу. #}
+<div class="promo enter" id="promo" style="animation-delay:80ms">
+  <div class="promo__slides" id="promo-slides">
+    <div class="promo__slide is-on">
+      <img class="promo__photo" src="/static/img/places/central.jpg" alt="" width="1120"
+           height="400" aria-hidden="true">
+      <span class="promo__tint"></span>
+      <span class="promo__veil"></span>
+      <div class="promo__text">
+        <div class="promo__title">Обед без ожидания</div>
+        <div class="promo__note">
+          Заказывайте заранее и забирайте к названной минуте — без очереди на кассе.
+        </div>
+      </div>
+      <span class="promo__badge" id="promo-badge">Готовим за 5 минут</span>
+    </div>
+  </div>
+  <div class="promo__dots" id="promo-dots" role="tablist" aria-label="Баннеры"></div>
+</div>
+
+{# Ближайшее окно выдачи: живой отсчёт до самой ранней свободной минуты. #}
+<div class="window-card reveal" id="window-card" hidden></div>
+
+{# Заведения — главное на экране, поэтому сразу после баннера. #}
+<div class="block__head reveal" style="margin-top:22px">
+  <h2 class="block__title">Заведения рядом</h2>
+  <span class="block__hint" id="places-count"></span>
+</div>
+{# Лента кухонь не ждёт появления: она нужна сразу, вместе со списком. #}
+<div class="chips enter--fade" id="cuisine-chips" role="group" aria-label="Кухни"
+     style="animation-delay:120ms">
+  <button class="chip" type="button" data-cuisine="" aria-pressed="true">Все</button>
+</div>
+
+<div class="places" id="places" aria-busy="true">
+  <div class="skeleton skeleton--card"></div>
+  <div class="skeleton skeleton--card"></div>
+  <div class="skeleton skeleton--card"></div>
+</div>
+
+<p class="small muted" id="places-note"></p>
+
+{# Витрина блюд: что заказывают в нескольких заведениях. Сразу под списком. #}
+<section class="block reveal" id="popular-block" hidden>
+  <div class="block__head">
+    <h2 class="block__title">Что берут чаще всего</h2>
+    <span class="block__hint">Цена — минимальная из заведений</span>
+  </div>
+  <div class="rail" id="popular-rail"></div>
+</section>
+
+{# Как это работает — в самом низу: это объяснение, а не главное действие. #}
+<section class="block reveal">
+  <h2 class="block__title">Как это работает</h2>
+  <div class="steps-row">
+    <div class="step-card shine">
+      <span class="step-card__icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M4 7h16M4 12h10M4 17h7" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <div class="step-card__n">1</div>
+      <div class="step-card__title">Собираете заказ</div>
+      <p class="step-card__text">Блюда из меню любимого заведения — без звонков и переписки.</p>
+    </div>
+    <div class="step-card shine">
+      <span class="step-card__icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 7.5V12l3.2 2" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <div class="step-card__n">2</div>
+      <div class="step-card__title">Выбираете минуту</div>
+      <p class="step-card__text">Кухня берёт столько заказов, сколько успевает. Никакой очереди.</p>
+    </div>
+    <div class="step-card shine">
+      <span class="step-card__icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M5 13.5 10 18.5 19 7" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <div class="step-card__n">3</div>
+      <div class="step-card__title">Забираете по номеру</div>
+      <p class="step-card__text">Назвали номер на кассе — заказ уже ждёт на полке выдачи.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block frame %}
+{{ super() }}
+{% include "partials/tabbar.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/places.js?v={{ static_version }}"></script>
+{% endblock %}

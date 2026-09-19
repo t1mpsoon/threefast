@@ -1,0 +1,31 @@
+{# Иллюстрации для пустых и ошибочных состояний.
+   Один графический язык: чернила для контуров, акцент для смысловой детали,
+   толщина линии 4, скруглённые концы. Без эмодзи и стоковых иконок. #}
+
+{% macro art_not_found() %}
+  <svg class="void-art" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+    <circle cx="52" cy="50" r="26" stroke-width="4"/>
+    <path d="M52 36v16l11 7" class="void-art__accent" stroke-width="4" stroke-linecap="round"/>
+    <path d="m71 69 18 18" stroke-width="5" stroke-linecap="round"/>
+    <path d="M18 98h34M18 108h56" stroke-width="4" stroke-linecap="round"/>
+  </svg>
+{% endmacro %}
+
+{% macro art_empty_menu() %}
+  <svg class="void-art" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+    <path d="M30 44h44v26a22 22 0 0 1-44 0V44Z" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M74 50h8a12 12 0 0 1 0 24h-8" stroke-width="4" stroke-linecap="round"/>
+    <path d="M44 30c0-4 4-4 4-8M56 30c0-4 4-4 4-8" class="void-art__accent"
+          stroke-width="4" stroke-linecap="round"/>
+    <path d="M22 92h76" stroke-width="4" stroke-linecap="round"/>
+  </svg>
+{% endmacro %}
+
+{% macro art_no_order() %}
+  <svg class="void-art" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+    <path d="M34 26h52v68l-9-7-8 7-9-7-9 7-8-7-9 7V26Z" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M46 48h28M46 62h18" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="80" cy="80" r="16" class="void-art__accent" stroke-width="4"/>
+    <path d="M80 72v9l6 4" class="void-art__accent" stroke-width="4" stroke-linecap="round"/>
+  </svg>
+{% endmacro %}

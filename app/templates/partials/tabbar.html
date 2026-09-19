@@ -1,0 +1,47 @@
+{# Нижняя навигация: основное действие всегда под рукой.
+   Плашка-индикатор едет к активной вкладке. #}
+<nav class="tabbar" aria-label="Основные разделы">
+  <span class="tabbar__pill" id="tabbar-pill" aria-hidden="true"></span>
+  <a class="tabbar__tab" href="/" data-tab="home"{% if tab == 'home' %} aria-current="page"{% endif %}>
+    <span class="tabbar__icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M3.5 10.5 12 3.5l8.5 7v9a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1v-9Z"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    Заведения
+  </a>
+  <a class="tabbar__tab" href="/order" data-tab="order"{% if tab == 'order' %} aria-current="page"{% endif %}>
+    <span class="tabbar__icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M12 7.5V12l3.2 2" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    Мой заказ
+  </a>
+  <a class="tabbar__tab" href="/login" data-tab="staff"{% if tab == 'staff' %} aria-current="page"{% endif %}>
+    <span class="tabbar__icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M12 3.5 4 7v5c0 4.4 3.3 7.6 8 8.5 4.7-.9 8-4.1 8-8.5V7l-8-3.5Z"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    Для смены
+  </a>
+  {# Тема переключается и с телефона: ссылки в шапке там скрыты. #}
+  <button class="tabbar__theme shift-toggle" type="button"
+          aria-label="Переключить оформление">
+    <svg class="shift__sun" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="2"/>
+      <path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <svg class="shift__moon" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2Z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</nav>

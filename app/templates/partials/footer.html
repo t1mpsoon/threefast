@@ -1,0 +1,50 @@
+{# Футер: короткая карта сервиса, без «маркетингового» шума. #}
+<footer class="foot">
+  <div class="shell foot__row">
+    <div class="foot__brand">
+      <span class="brand__mark brand__mark--sm" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none">
+          <path d="M22 21c-3.6 3.3-5.6 7.4-5.9 11.9" stroke="#FF4F32" stroke-width="3.6"
+                stroke-linecap="round"/>
+          <path d="M32 8c2.6 0 4.7 2 4.9 4.5 8.6 2.4 14.6 10.2 15 19.4H12.1c.4-9.2 6.4-17 15-19.4C27.3 10 29.4 8 32 8Z"
+                fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <circle cx="32" cy="7" r="3.4" fill="none" stroke="#1B1D21" stroke-width="3"/>
+          <path d="M7.5 35.5h49c0 2.4-2 4.3-4.4 4.3h-2.6c-.6 3.2-3.4 5.5-6.7 5.5H21.2c-3.3 0-6.1-2.3-6.7-5.5h-2.6c-2.4 0-4.4-1.9-4.4-4.3Z"
+                fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <path d="M14.5 45.3h35c-1 2.7-3.5 4.5-6.4 4.5H20.9c-2.9 0-5.4-1.8-6.4-4.5Z"
+                fill="#FF4F32" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+          <path d="M4 20h17" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+          <path d="M1.5 29.5h22" stroke="#1B1D21" stroke-width="5" stroke-linecap="round"/>
+          <path d="M4 39h15" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div>
+        <div class="foot__name">Three<span class="brand__accent">Fast</span></div>
+        <div class="foot__note">Предзаказ еды к точной минуте. Без ожидания в очереди.</div>
+      </div>
+    </div>
+
+    <nav class="foot__cols" aria-label="Разделы сервиса">
+      <div class="foot__col">
+        <div class="foot__title">Гостям</div>
+        <a href="/">Заведения</a>
+        <a href="/order">Мой заказ</a>
+      </div>
+      <div class="foot__col">
+        <div class="foot__title">Заведениям</div>
+        <a href="/login">Панель смены</a>
+        <a href="/login?next=/super">Подключить точку</a>
+      </div>
+      <div class="foot__col">
+        <div class="foot__title">Оформление</div>
+        <button class="foot__link sound-toggle" type="button">Звуки интерфейса</button>
+        <button class="foot__link shift-toggle" type="button">Светлая и тёмная тема</button>
+      </div>
+    </nav>
+  </div>
+
+  <div class="shell foot__bottom">
+    <span>© {{ app_title }} · сервис предзаказа</span>
+    <span>Гость не регистрируется: нужны только имя и телефон</span>
+  </div>
+</footer>
