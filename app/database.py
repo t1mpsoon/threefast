@@ -73,6 +73,12 @@ def build_engine(database_url: str | None = None) -> Engine:
         else:
             # WAL повышает устойчивость к конкурентным чтениям/записям (защита от "database is locked").
             kwargs["connect_args"]["timeout"] = 30
+    else:
+        # Managed-базы на хостинге закрывают простаивающие соединения: без
+        # проверки живости первый запрос после паузы падает с «server closed
+        # the connection unexpectedly».
+        kwargs["pool_pre_ping"] = True
+        kwargs["pool_recycle"] = 280
 
     engine = create_engine(url, **kwargs)
 

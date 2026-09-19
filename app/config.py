@@ -90,6 +90,21 @@ class Settings(BaseSettings):
             raise ValueError(f"LOG_LEVEL должен быть одним из {sorted(allowed)}")
         return level
 
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_database_url(cls, value: str) -> str:
+        """Приводит ссылку от хостинга к виду, понятному SQLAlchemy.
+
+        Render и Heroku выдают `postgres://…`, а SQLAlchemy 2.0 требует явный
+        драйвер: `postgres://` он больше не понимает и падает при старте.
+        """
+        url = (value or "").strip()
+        if url.startswith("postgres://"):
+            url = "postgresql+psycopg://" + url[len("postgres://"):]
+        elif url.startswith("postgresql://"):
+            url = "postgresql+psycopg://" + url[len("postgresql://"):]
+        return url
+
     # ── Производные свойства ───────────────────────────────────────────────
     @property
     def is_production(self) -> bool:
@@ -98,6 +113,10 @@ class Settings(BaseSettings):
     @property
     def is_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")
+
+    @property
+    def is_postgres(self) -> bool:
+        return self.database_url.startswith("postgresql")
 
     @property
     def is_memory_db(self) -> bool:

@@ -16,6 +16,8 @@ uvicorn[standard]>=0.30
 pydantic>=2.9
 pydantic-settings>=2.4
 sqlalchemy>=2.0.35
+# Драйвер Postgres: на хостинге база managed, локально не нужен.
+psycopg[binary]>=3.2
 alembic>=1.13
 jinja2>=3.1
 python-dotenv>=1.0
