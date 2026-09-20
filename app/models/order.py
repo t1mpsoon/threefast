@@ -40,6 +40,37 @@ class OrderStatus(StrEnum):
         }[self.value]
 
     @property
+    def headline(self) -> str:
+        """Продолжение заголовка экрана заказа: «Заказ EX-1234 готов!».
+
+        Одна формулировка на шаблон и на опрос статуса: иначе строка на экране
+        гостя расходилась бы с тем, что показывает кухня.
+        """
+        return {
+            "confirmed": "принят",
+            "in_progress": "готовят",
+            "ready": "готов!",
+            "picked_up": "выдан",
+            "cancelled": "отменён",
+            "expired": "не востребован",
+        }[self.value]
+
+    @property
+    def progress_step(self) -> int:
+        """Шаг индикатора «Принят → Готовится → Готово → Выдано».
+
+        Одна таблица на шаблон, API и подсказки: раньше шаг был продублирован
+        в шаблоне заказа, и экран успеха показывал «Готовится» сразу после
+        оформления, хотя кухня заказ ещё не приняла в работу.
+        """
+        return {
+            "confirmed": 1,
+            "in_progress": 2,
+            "ready": 3,
+            "picked_up": 4,
+        }.get(self.value, 0)
+
+    @property
     def is_active(self) -> bool:
         """Заказ ещё в работе (виден в очереди персонала)."""
         return self in {OrderStatus.CONFIRMED, OrderStatus.IN_PROGRESS, OrderStatus.READY}

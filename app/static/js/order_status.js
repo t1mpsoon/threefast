@@ -7,7 +7,6 @@
   var input = document.getElementById('code-input');
   var cancel = document.getElementById('cancel-button');
   var share = document.getElementById('share-button');
-  var EVERY_MS = 15000;
 
   /* QR заказа: рисуется в браузере, без внешних сервисов. */
   var qrBox = document.getElementById('order-qr');
@@ -110,12 +109,17 @@
     return '';
   }
 
-  function paint(status, tone) {
+  function paint(status, tone, headline) {
     var step = STEP[status] || 0;
     var statusTone = tone || 'guest';
 
     /* Тон один на весь экран: плашка, шкала и полоса панели совпадают. */
     card.dataset.tone = statusTone;
+
+    /* Заголовок тоже говорит правду: «принят» → «готовят» → «готов!».
+       Формулировку даёт сервер — та же строка, что и у кухни. */
+    var head = card.querySelector('[data-role="headline"]');
+    if (head && headline) head.textContent = 'Заказ ' + code + ' ' + headline;
 
     var stateOut = card.querySelector('[data-role="state"]');
     if (stateOut) {
@@ -194,12 +198,36 @@
     known = status;
   }
 
+  /* ── Живая синхронизация с кухней ──────────────────────────────────────
+     Пока заказ в работе, статус спрашиваем каждые 5 секунд: кухня меняет его
+     у себя, гость видит это без перезагрузки. Как только заказ завершён,
+     опрос прекращается — дальше меняться нечему. В скрытой вкладке сервер
+     не дёргаем: при возврате статус обновляется сразу. */
+  var POLL_MS = 5000;
+  var pollTimer = null;
+  var stopped = false;
+
+  function schedulePoll() {
+    if (pollTimer) { window.clearTimeout(pollTimer); pollTimer = null; }
+    if (stopped || document.hidden) return;
+    pollTimer = window.setTimeout(async function () {
+      pollTimer = null;
+      await refresh();
+      schedulePoll();
+    }, POLL_MS);
+  }
+
   async function refresh() {
     try {
       var order = await EP.apiFetch('/api/orders/' + encodeURIComponent(code) + '/status');
-      paint(order.status, order.status_tone);
+      paint(order.status, order.status_tone, order.status_headline);
+      /* is_active приходит с сервера: выдан, отменён или снят — опрос не нужен. */
+      if (!order.is_active) stopped = true;
     } catch (error) {
-      if (error.status === 404) EP.say('Заказ с таким номером не нашли.', 'bad');
+      if (error.status === 404) {
+        stopped = true;
+        EP.say('Заказ с таким номером не нашли.', 'bad');
+      }
     }
   }
 
@@ -213,7 +241,8 @@
         try {
           var order = await EP.apiFetch('/api/orders/' + encodeURIComponent(code) + '/cancel',
             { method: 'POST' });
-          paint(order.status);
+          paint(order.status, order.status_tone, order.status_headline);
+          stopped = true;
           EP.say('Заказ отменён. Если передумаете — оформите новый.', 'info');
         } catch (error) {
           EP.say(error.message, 'bad');
@@ -222,11 +251,17 @@
     });
   }
 
-  window.setInterval(refresh, EVERY_MS);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { schedulePoll(); return; }  /* снимет таймер */
+    refresh().then(schedulePoll);
+  });
   if (window.EPNotify && known && known !== 'picked_up' && known !== 'cancelled' && known !== 'expired') {
     window.EPNotify.ask(card);
   }
+
+  /* Заказ уже завершён — следить не за чем; иначе начинаем опрос. */
+  if (known === 'picked_up' || known === 'cancelled' || known === 'expired') stopped = true;
+  schedulePoll();
 
   /* Первый прогон заполнения — чтобы полоса «налилась» при открытии экрана. */
   if (tracker) {

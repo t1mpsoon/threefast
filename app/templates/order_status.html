@@ -7,17 +7,24 @@
 
 {% block content %}
 {% if order and fresh %}
-  {# Экран успеха: галочка отрисовывается один раз, затем прогресс заказа. #}
-  <div class="success">
+  {# Экран успеха: галочка отрисовывается один раз, затем прогресс заказа.
+     Экран живой: order_status.js ищет именно #order-card, и без него гость
+     видел бы «принят» до перезагрузки, пока кухня уже готовит. #}
+  <div class="success" id="order-card" data-code="{{ order.order_code }}"
+       data-tone="{{ order.status_enum.tone }}">
     <div class="success__mark" aria-hidden="true">
       <svg viewBox="0 0 52 52" fill="none">
         <path class="check-path" d="M14 27.5 22.5 36 38 18"/>
       </svg>
     </div>
-    <h1>Заказ {{ order.order_code }} принят</h1>
+    <h1 data-role="headline">Заказ {{ order.order_code }} {{ order.status_enum.headline }}</h1>
     <p class="muted" style="margin-top:8px">
       {{ order.guest_name }}, кухня готовит к названной минуте.
     </p>
+    <div style="margin-top:14px">
+      <span class="badge badge--{{ order.status_enum.tone }}" data-role="state">{{ order.status_enum.title }}</span>
+    </div>
+    <p class="muted small" style="margin-top:10px" data-role="explain">{{ order.status_enum.hint }}</p>
 
     <p class="muted small" style="margin-top:22px">Забрать в</p>
     <div class="success__time">{{ order.slot.slot_datetime|slot_time }}</div>
@@ -25,7 +32,7 @@
       {{ order.establishment.name if order.establishment else '' }}{% if order.establishment and order.establishment.address %} · {{ order.establishment.address }}{% endif %}
     </p>
 
-    {{ progress(order.status, 2, order.status_enum.tone) }}
+    {{ progress(order.status, order.status_enum.progress_step, order.status_enum.tone) }}
 
     {% if order.status in ("confirmed", "in_progress", "ready") %}
     <div class="order-qr" id="order-qr" data-code="{{ order.order_code }}">
@@ -57,7 +64,7 @@
     </div>
   </div>
 {% elif order %}
-  {% set step = {'confirmed': 1, 'in_progress': 2, 'ready': 3, 'picked_up': 4}.get(order.status, 0) %}
+  {% set step = order.status_enum.progress_step %}
   {# Тон статуса один на все экраны: цвет плашки и шкалы совпадает с кухней. #}
   <div class="stack" id="order-card" data-code="{{ order.order_code }}"
        data-tone="{{ order.status_enum.tone }}" style="padding-top:16px">
@@ -82,7 +89,7 @@
       </div>
 
       <div style="margin-top:18px">
-        {{ progress(order.status, {'confirmed': 1, 'in_progress': 2, 'ready': 3, 'picked_up': 4}.get(order.status, 0), order.status_enum.tone) }}
+        {{ progress(order.status, order.status_enum.progress_step, order.status_enum.tone) }}
       </div>
     </div>
 

@@ -97,6 +97,9 @@ class OrderStatusResponse(BaseModel):
     order_code: str
     status: str
     status_title: str
+    # Продолжение заголовка экрана: «Заказ EX-1234 готов!» — одна формулировка
+    # на шаблон и на опрос статуса, без отдельной таблицы строк в браузере.
+    status_headline: str = ""
     # Тон статуса: один и тот же на всех экранах — guest | active | done | lost.
     status_tone: str = "guest"
     slot_datetime: datetime

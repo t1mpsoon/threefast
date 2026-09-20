@@ -16,6 +16,10 @@
 
   var orders = [];
   var settings = null;
+  /* Отпечаток последней отрисовки очереди: по нему понимаем, изменилось ли
+     что-то на самом деле. Без него каждые несколько секунд заново играла
+     анимация появления, сбрасывались выделение и позиция прокрутки. */
+  var lastPainted = null;
 
   var NEXT = {
     confirmed: { to: 'in_progress', label: 'Начать готовить' },
@@ -105,7 +109,16 @@
     });
   }
 
+  function queueSignature() {
+    return orders.map(function (order) {
+      return order.id + ':' + order.status + ':' + order.version;
+    }).join(',');
+  }
+
   function paint() {
+    var fresh = queueSignature();
+    if (fresh === lastPainted) return;
+    lastPainted = fresh;
     if (!orders.length) {
       host.innerHTML = '<div class="empty">' +
         '<h3>Очередь пуста</h3>' +
@@ -139,6 +152,9 @@
         EP.go('/login');
         return;
       }
+      /* Список затёрт сообщением об ошибке: следующий удачный ответ
+         обязан перерисовать его, даже если данные не изменились. */
+      lastPainted = null;
       host.innerHTML = '<div class="empty"><h3>Не удалось загрузить очередь</h3><p>' +
         EP.escapeHtml(error.message) + '</p></div>';
     }
@@ -639,10 +655,13 @@
   /* ── Запуск ────────────────────────────────────────────────────────────── */
   window.setInterval(tick, 1000);
   loadOrders();
+  /* Очередь подтягивается сама: заказ гостя должен появиться на экране смены
+     без перезагрузки, а смена статуса — сразу отразиться у гостя. В скрытой
+     вкладке сервер не дёргаем. */
   window.setInterval(function () {
     if (document.hidden) return;
     loadOrders();
-  }, 20000);
+  }, 8000);
   showPanel('queue');
   window.addEventListener('resize', function () {
     var active = root.querySelector('.crew__tab.is-on');

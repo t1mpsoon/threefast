@@ -79,17 +79,9 @@ def slot_to_schema(view: SlotView) -> SlotOut:
     )
 
 
-PROGRESS_STEPS = {
-    OrderStatus.CONFIRMED: 1,
-    OrderStatus.IN_PROGRESS: 2,
-    OrderStatus.READY: 3,
-    OrderStatus.PICKED_UP: 4,
-}
-
-
 def progress_step(status: OrderStatus) -> int:
     """Шаг индикатора «Принят → Готовится → Готово → Выдано»."""
-    return PROGRESS_STEPS.get(status, 0)
+    return status.progress_step
 
 
 def status_message(order: Order, *, now: datetime | None = None) -> str | None:
@@ -123,6 +115,7 @@ def order_to_status_schema(order: Order) -> OrderStatusResponse:
         order_code=order.order_code,
         status=status.value,
         status_title=status.title,
+        status_headline=status.headline,
         status_tone=status.tone,
         slot_datetime=order.slot.slot_datetime,
         created_at=order.created_at,

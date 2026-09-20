@@ -74,6 +74,7 @@ def create_order(
 def get_order_status(
     order_code: str,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> OrderStatusResponse:
     """Статус заказа по короткому коду.
@@ -83,6 +84,10 @@ def get_order_status(
     упирается в лимит промахов — считаем именно неудачные попытки, чтобы
     обычный гость не тратил лимит на просмотр своего заказа.
     """
+    # Экран заказа обновляется сам: кэш браузера или посредника показал бы
+    # гостю устаревший статус, пока кухня уже начала готовить.
+    response.headers["Cache-Control"] = "no-store"
+
     if not is_valid_order_code(order_code):
         raise InputError("Код заказа должен состоять из 4 символов, например EX-3467")
 
@@ -103,9 +108,12 @@ def get_order_status(
 def cancel_order(
     order_code: str,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> OrderStatusResponse:
     """Отмена заказа гостем до момента выдачи."""
+    response.headers["Cache-Control"] = "no-store"
+
     if not is_valid_order_code(order_code):
         raise InputError("Код заказа должен состоять из 4 символов, например EX-3467")
 
