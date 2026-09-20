@@ -15,7 +15,17 @@
   var phoneInput = document.getElementById('guest-phone');
   var note = document.getElementById('guest-note');
   var noteCount = document.getElementById('note-count');
+  var tableInput = document.getElementById('guest-table');
   var KEY_CELL = 'express_pickup_pending_v1';
+
+  /* Метка со QR-плаката: `?src=table5` — столик подставляем сразу, гостю
+     остаётся только подтвердить. Ссылку даёт страница плаката. */
+  if (tableInput) {
+    var fromPoster = /^table(\d{1,2})$/i.exec(
+      (new URLSearchParams(window.location.search).get('src') || '').trim()
+    );
+    if (fromPoster) tableInput.value = String(Number(fromPoster[1]));
+  }
 
   /* Пока заказ отправляется, кнопку нельзя включать обратно. Иначе правка
      состава в сводке (она шлёт cart:changed) снова делала кнопку активной,
@@ -198,7 +208,22 @@
       EP.badField('guest-phone', 'Нужен номер вида +7 701 123 45 67, иначе не сможем предупредить о задержке');
       ok = false;
     }
-    return ok ? { name: name, phone: normalized } : null;
+    var table = tableNumber();
+    if (table === false) {
+      EP.badField('guest-table', 'Номер столика — от 1 до 60. Оставьте пустым, если заказ на вынос');
+      ok = false;
+    }
+    return ok ? { name: name, phone: normalized, table: table || null } : null;
+  }
+
+  /* Столик необязателен: пусто — заказ на вынос. Но если номер назван,
+     он должен быть номером, иначе кухня не поймёт, куда нести. */
+  function tableNumber() {
+    if (!tableInput) return null;
+    var raw = String(tableInput.value).trim();
+    if (!raw) return null;
+    var number = Number(raw);
+    return Number.isInteger(number) && number >= 1 && number <= 60 ? number : false;
   }
 
   /* Три плавающие точки на время отправки. */
@@ -249,6 +274,7 @@
       items: Cart.dishes().map(function (d) { return { menu_item_id: d.id, quantity: d.quantity }; }),
       payment_method: form.querySelector('input[name="payment_method"]:checked').value,
       note: (note ? note.value.trim() : '') || null,
+      table_number: values.table,
       idempotency_key: pendingKey()
     };
 

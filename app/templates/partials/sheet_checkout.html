@@ -38,6 +38,14 @@
       </div>
 
       <div class="field">
+        <label for="guest-table">Столик <span class="muted">— если заказываете в зале</span></label>
+        <input type="number" id="guest-table" inputmode="numeric" min="1" max="60"
+               placeholder="Например, 5" autocomplete="off">
+        <div class="field__hint">С номером столика кухня принесёт заказ к вам. Метка со QR-плаката подставляется сама.</div>
+        <div class="field__error"></div>
+      </div>
+
+      <div class="field">
         <span class="bold small" style="display:block;margin-bottom:6px">Оплата при получении</span>
         <div class="segment" role="radiogroup" aria-label="Способ оплаты">
           <label>

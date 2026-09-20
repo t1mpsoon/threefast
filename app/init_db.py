@@ -14,7 +14,7 @@ import sys
 from datetime import time
 from decimal import Decimal
 
-from sqlalchemy import inspect, select
+from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -119,8 +119,51 @@ def tables_exist() -> bool:
     return bool(inspect(engine).get_table_names())
 
 
+def add_missing_columns() -> list[str]:
+    """Дополняет существующие таблицы колонками, которых не хватает.
+
+    `create_all` умеет создавать только отсутствующие таблицы и уже созданные
+    не трогает. Из-за этого после добавления поля в модель боевая база
+    оставалась без колонки, и первый же INSERT падал. Здесь схема догоняется —
+    но только для необязательных колонок: обязательную нельзя добавить в
+    непустую таблицу без значения по умолчанию, для таких случаев остаётся
+    `alembic upgrade head`.
+    """
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+    preparer = engine.dialect.identifier_preparer
+    added: list[str] = []
+
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+        actual = {column["name"] for column in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in actual:
+                continue
+            if not column.nullable:
+                logger.error(
+                    "В таблице %s нет обязательной колонки %s: примените alembic upgrade head",
+                    table.name,
+                    column.name,
+                )
+                continue
+            statement = "ALTER TABLE {} ADD COLUMN {} {}".format(
+                preparer.quote(table.name),
+                preparer.quote(column.name),
+                column.type.compile(dialect=engine.dialect),
+            )
+            with engine.begin() as connection:
+                connection.execute(text(statement))
+            added.append(f"{table.name}.{column.name}")
+            logger.warning("Схема дополнена колонкой %s.%s", table.name, column.name)
+
+    return added
+
+
 def create_schema() -> None:
     Base.metadata.create_all(bind=engine)
+    add_missing_columns()
     logger.info("Схема БД готова (%s)", engine.url.render_as_string(hide_password=True))
 
 

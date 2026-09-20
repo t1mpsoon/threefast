@@ -63,6 +63,10 @@
         '</div>' +
         '<div class="ticket__guest">' + EP.escapeHtml(order.guest_name) +
           ' <span class="muted">' + EP.escapeHtml(order.guest_phone) + '</span></div>' +
+        /* Столик виден сразу: смена несёт заказ к гостю, а не выкликивает номер. */
+        (order.table_number
+          ? '<div class="ticket__table">Стол ' + Number(order.table_number) + '</div>'
+          : '') +
         '<div class="ticket__dishes">' + dishes(order) + '</div>' +
         (order.note
           ? '<div class="ticket__note">' +

@@ -541,6 +541,12 @@ body.has-tabbar .cartbar { bottom: var(--tabbar-h); }
   background: var(--amber-soft); color: #8A5207;
   border-radius: var(--r-inner); font-size: 0.84rem; font-weight: 700;
 }
+/* Столик смене важнее примечания: вынести заказ нужно к гостю, а не выкликнуть. */
+.ticket__table {
+  display: inline-block; margin-top: 5px; padding: 4px 12px;
+  background: var(--flame-soft); color: var(--flame-dark);
+  border-radius: var(--r-pill); font-size: 0.86rem; font-weight: 800;
+}
 .ticket__side { display: grid; gap: 6px; justify-items: end; min-width: 0; }
 .ticket__sum { font-weight: 800; font-size: 1.05rem; }
 /* Действия идут в строку: очередь из десятков талонов остаётся компактной. */
@@ -2230,10 +2236,13 @@ body:not(.has-tabbar) .to-top { bottom: 16px; }
 /* ── Плакат QR и лендинг для заведений ─────────────────────────────────── */
 .qr-page { padding: 16px 0 40px; }
 .qr-form { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin: 12px 0; }
-.qr-form input, .biz__calc input {
+.qr-form input, .qr-form select, .biz__calc input {
   display: block; width: 110px; margin-top: 4px; padding: 10px 12px; font: inherit;
   border: 1.5px solid var(--cloud); border-radius: var(--r-inner); background: var(--cloud); color: var(--ink);
 }
+/* Выбор заведения и стола: список шире числового поля, иначе названия обрезаются. */
+.qr-form select { width: auto; min-width: 190px; max-width: 100%; }
+.qr-form label { min-width: 0; }
 .qr-sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 .qr-poster {
   background: #fff; color: #1B1D21; border: 2px solid #1B1D21; border-radius: var(--r-card);
@@ -2343,7 +2352,7 @@ button, a, .chip { -webkit-tap-highlight-color: transparent; touch-action: manip
   .notify-ask .btn, .repeat-order .btn { width: 100%; min-height: 44px; }
   .notify-ask__no { position: absolute; right: 6px; top: 6px; }
   .notify-ask { position: relative; padding-right: 44px; }
-  .qr-form input { width: 100%; }
+  .qr-form input, .qr-form select { width: 100%; }
 }
 
 /* ── QR заказа и сканер ────────────────────────────────────────────────── */

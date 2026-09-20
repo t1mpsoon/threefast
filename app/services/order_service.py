@@ -121,6 +121,7 @@ class OrderService:
             guest_name=payload.guest_name,
             guest_phone=payload.guest_phone,
             note=payload.note,
+            table_number=payload.table_number,
             status=OrderStatus.CONFIRMED.value,
             total_amount=total_amount,
             payment_method=payload.payment_method.value,

@@ -28,6 +28,8 @@ class OrderCreateRequest(BaseModel):
     payment_method: PaymentMethod = PaymentMethod.CASH_ON_PICKUP
     # Примечание к заказу: «без лука», «приборы на двоих». Необязательное.
     note: str | None = Field(default=None, max_length=200)
+    # Столик: гость указывает сам, метка с QR-плаката подставляет номер заранее.
+    table_number: int | None = Field(default=None, ge=1, le=60)
     idempotency_key: str = Field(min_length=8, max_length=64)
 
     @field_validator("guest_name")
@@ -112,6 +114,8 @@ class OrderStatusResponse(BaseModel):
     payment_method_title: str = ""
     guest_name: str
     note: str | None = None
+    # Столик гостя: null — заказ на вынос.
+    table_number: int | None = None
     items: list[OrderItemOut] = Field(default_factory=list)
     # Прогресс для индикатора «Принят → Готовится → Готово → Выдано».
     progress_step: int = 0
@@ -138,6 +142,8 @@ class StaffOrderOut(BaseModel):
     ready_at: datetime | None = None
     version: int
     note: str | None = None
+    # Столик нужен смене, чтобы вынести заказ, а не выкликивать номер.
+    table_number: int | None = None
     allowed_transitions: list[str] = Field(default_factory=list)
     items: list[OrderItemOut] = Field(default_factory=list)
 

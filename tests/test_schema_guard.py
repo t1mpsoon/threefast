@@ -23,7 +23,7 @@ from app.schema_guard import (
 def test_migration_head_is_the_latest_revision() -> None:
     """Головная ревизия — та, на которую никто не ссылается как на предыдущую."""
     head = migration_head()
-    assert head == "0005_superadmin_no_place", f"неожиданная головная ревизия: {head}"
+    assert head == "0006_order_table", f"неожиданная головная ревизия: {head}"
 
     # Проверяем на файлах: цепочка миграций должна быть линейной и полной.
     revisions = {}
@@ -86,13 +86,13 @@ def test_outdated_database_gets_actionable_hint(tmp_path: Path) -> None:
     report = check_schema(url)
     assert report.state == "outdated"
     assert report.current == "0002_showcase"
-    assert report.head == "0005_superadmin_no_place"
+    assert report.head == "0006_order_table"
     assert not report.is_ok
 
     hint = startup_hint(report, url)
     assert hint is not None
     assert "alembic upgrade head" in hint, "в подсказке должна быть готовая команда"
-    assert "0002_showcase" in hint and "0005_superadmin_no_place" in hint
+    assert "0002_showcase" in hint and "0006_order_table" in hint
 
 
 def test_current_database_has_no_hint() -> None:
@@ -106,7 +106,7 @@ def test_current_database_has_no_hint() -> None:
 
 
 def test_real_demo_database_matches_models() -> None:
-    """В демо-базе есть и orders.note, и staff_users.is_super."""
+    """В демо-базе есть и orders.note, и staff_users.is_super, и orders.table_number."""
     db_file = database_path("sqlite:///./data/express_pickup.db")
     assert db_file is not None and db_file.exists()
 
@@ -117,6 +117,7 @@ def test_real_demo_database_matches_models() -> None:
         }
         assert "note" in columns("orders"), "миграция 0003_order_note не применена"
         assert "is_super" in columns("staff_users"), "миграция 0004_super_admin не применена"
+        assert "table_number" in columns("orders"), "миграция 0006_order_table не применена"
     finally:
         connection.close()
 

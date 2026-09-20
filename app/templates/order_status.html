@@ -29,7 +29,7 @@
     <p class="muted small" style="margin-top:22px">Забрать в</p>
     <div class="success__time">{{ order.slot.slot_datetime|slot_time }}</div>
     <p class="success__place">
-      {{ order.establishment.name if order.establishment else '' }}{% if order.establishment and order.establishment.address %} · {{ order.establishment.address }}{% endif %}
+      {{ order.establishment.name if order.establishment else '' }}{% if order.establishment and order.establishment.address %} · {{ order.establishment.address }}{% endif %}{% if order.table_number %} · столик {{ order.table_number }}{% endif %}
     </p>
 
     {{ progress(order.status, order.status_enum.progress_step, order.status_enum.tone) }}
@@ -111,6 +111,11 @@
         <div class="summary__row small muted">
           <span>Заведение</span><span>{{ order.establishment.name if order.establishment else '' }}</span>
         </div>
+        {% if order.table_number %}
+        <div class="summary__row small muted">
+          <span>Столик</span><span>№ {{ order.table_number }}</span>
+        </div>
+        {% endif %}
       </div>
 
       {% if order.note %}

@@ -5,14 +5,34 @@
   <div class="qr-tools no-print">
     <h1>QR-плакат</h1>
     <p class="muted">Распечатайте и поставьте на кассе или столы. Гость сканирует камерой телефона — приложение не нужно.</p>
-    <form method="get" class="qr-form">
-      <label>Плакатов по столам
-        <input type="number" name="tables" min="0" max="60" value="{{ posters|length if posters[0].label else 0 }}">
+    <form method="get" action="/qr" class="qr-form">
+      <label>Заведение
+        <select name="place">
+          {% for option in places %}
+            <option value="{{ option.id }}"{% if option.id == establishment.id %} selected{% endif %}>{{ option.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Что печатаем
+        <select name="print">
+          <option value="one"{% if not hall_tables and not chosen_table %} selected{% endif %}>Один общий плакат</option>
+          <option value="all"{% if hall_tables and not chosen_table %} selected{% endif %}>Все столы (1–{{ hall_tables or 1 }})</option>
+          {% for number in range(1, 61) %}
+            <option value="table{{ number }}"{% if chosen_table == number %} selected{% endif %}>Только стол {{ number }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Столов в зале
+        <input type="number" name="tables" min="0" max="60" value="{{ hall_tables }}">
       </label>
       <button class="btn btn--sm" type="submit">Обновить</button>
       <button class="btn btn--sm btn--line" type="button" onclick="window.print()">Печать</button>
     </form>
-    <p class="muted small">Ссылка с меткой стола (<code>?src=tableN</code>) позволит потом видеть, какие столы заказывают чаще.</p>
+    <p class="muted small">
+      «Столов в зале» нужно для варианта «Все столы». Метка стола в ссылке
+      (<code>?src=tableN</code>) подставит гостю номер столика при оформлении,
+      и кухня увидит, куда нести заказ.
+    </p>
   </div>
   <div class="qr-sheet">
     {% for p in posters %}

@@ -359,6 +359,7 @@
         '<p class="scan-card__banner">' + esc(banner) + '</p>' +
         '<dl class="scan-card__info">' +
           '<div><dt>Гость</dt><dd>' + esc(order.guest_name) + ' · <a href="tel:' + esc(order.guest_phone) + '">' + esc(order.guest_phone) + '</a></dd></div>' +
+          (order.table_number ? '<div><dt>Столик</dt><dd>№ ' + Number(order.table_number) + '</dd></div>' : '') +
           '<div><dt>Время выдачи</dt><dd>' + esc(String(order.slot_datetime).slice(11, 16)) + '</dd></div>' +
           '<div><dt>Сумма</dt><dd>' + EP.money(order.total_amount) + '</dd></div>' +
         '</dl>' +

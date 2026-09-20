@@ -177,6 +177,10 @@ class Order(Base):
     guest_phone: Mapped[str] = mapped_column(String(20), nullable=False)
     # Примечание к заказу: «без лука», «приборы на двоих». Необязательное поле.
     note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Столик, за которым сидит гость. Гость выбирает его сам, а метка со
+    # QR-плаката (`?src=table5`) подставляет номер заранее. Необязательное:
+    # заказ на вынос идёт без столика.
+    table_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default=OrderStatus.CONFIRMED.value, index=True
     )

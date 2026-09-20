@@ -127,6 +127,7 @@ def order_to_status_schema(order: Order) -> OrderStatusResponse:
         payment_method_title=payment_title(order),
         guest_name=order.guest_name,
         note=order.note,
+        table_number=order.table_number,
         items=[OrderItemOut.model_validate(item) for item in order.items],
         progress_step=progress_step(status),
         is_active=status.is_active,
@@ -151,6 +152,7 @@ def order_to_staff_schema(order: Order) -> StaffOrderOut:
         ready_at=order.ready_at,
         version=order.version,
         note=order.note,
+        table_number=order.table_number,
         allowed_transitions=sorted(
             transition.value for transition in order.can_transition_to
         ),
