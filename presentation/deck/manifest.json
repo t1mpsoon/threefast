@@ -1,5 +1,6 @@
 {
   "slides_images": 17,
+  "place_photos": 3,
   "qr": true,
   "site": "https://threefast.onrender.com",
   "files": [
@@ -15,6 +16,9 @@
     "manifest.json",
     "menu.jpg",
     "menuphone.jpg",
+    "place-central.jpg",
+    "place-cup.jpg",
+    "place-green.jpg",
     "platform.jpg",
     "poster.jpg",
     "qr.svg",

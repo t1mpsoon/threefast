@@ -18,6 +18,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -53,6 +54,14 @@ WANTED = {
 }
 
 
+# Фотографии демо-заведений: нужны на слайде про аудиторию.
+PLACES = {
+    "central": "place-central",
+    "green": "place-green",
+    "cup": "place-cup",
+}
+
+
 def shrink() -> int:
     """Уменьшает снимки до ширины слайда. Без Pillow — копирует как есть."""
     try:
@@ -85,6 +94,32 @@ def shrink() -> int:
         made += 1
         size = (IMAGES / f"{short}.jpg").stat().st_size / 1024
         print(f"  {short}.jpg  {size:,.0f} КБ")
+    return made
+
+
+def place_photos() -> int:
+    """Фото заведений из приложения — чтобы слайд про аудиторию был живым."""
+    try:
+        from PIL import Image
+    except ImportError:  # pragma: no cover
+        return 0
+
+    source_dir = ROOT / "app" / "static" / "img" / "places"
+    IMAGES.mkdir(parents=True, exist_ok=True)
+    made = 0
+    for name, short in PLACES.items():
+        source = source_dir / f"{name}.jpg"
+        if not source.exists():
+            continue
+        with Image.open(source) as image:
+            image = image.convert("RGB")
+            if image.width > 900:
+                image = image.resize(
+                    (900, round(image.height * 900 / image.width)), Image.LANCZOS
+                )
+            image.save(IMAGES / f"{short}.jpg", "JPEG", quality=86, optimize=True)
+        made += 1
+        print(f"  {short}.jpg")
     return made
 
 
@@ -125,7 +160,13 @@ console.log('qr ok');
 
 
 def export_pdf() -> bool:
-    """Печатает колоду в PDF: один слайд — одна страница 16:9."""
+    """Печатает колоду в PDF: один слайд — одна страница 16:9.
+
+    Каждый слайд снимается картинкой и складывается в страницу. Векторный
+    текст в PDF не переносится, зато разбиение на страницы не зависит от
+    пагинации Chrome: она добавляла пустые страницы на стыках, потому что
+    документ выходил на 17 px выше слайда из-за строчных боксов в разметке.
+    """
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:  # pragma: no cover
@@ -138,22 +179,59 @@ def export_pdf() -> bool:
         return False
 
     target = SOURCE / "threefast.pdf"
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 720})
-        page.goto(deck.as_uri(), wait_until="networkidle")
-        page.evaluate("() => document.fonts && document.fonts.ready")
-        page.wait_for_timeout(1500)
-        page.pdf(
-            path=str(target),
-            width="13.333in",
-            height="7.5in",
-            print_background=True,
-            margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
-        )
-        browser.close()
+    with tempfile.TemporaryDirectory(prefix="threefast-pdf-") as folder:
+        work = Path(folder)
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 720},
+                                    device_scale_factor=2)
+            page.goto(deck.as_uri(), wait_until="networkidle")
+            page.evaluate("() => document.fonts && document.fonts.ready")
+            page.wait_for_timeout(1400)
+
+            total = page.evaluate("() => document.querySelectorAll('.slide').length")
+            pages: list[str] = []
+            for number in range(1, total + 1):
+                page.evaluate(
+                    "(n) => document.querySelectorAll('.slide').forEach("
+                    "(slide, i) => slide.classList.toggle('is-active', i === n - 1))",
+                    number,
+                )
+                page.wait_for_timeout(180)
+                shot = work / f"slide-{number:02d}.png"
+                page.locator(".slide.is-active").screenshot(path=str(shot))
+                pages.append(shot.as_uri())
+
+            # Собираем страницы: картинка ровно по размеру страницы 16:9.
+            builder = work / "builder.html"
+            slides_html = "\n".join(
+                f'<section><img src="{uri}" alt=""></section>' for uri in pages
+            )
+            builder.write_text(
+                "<!DOCTYPE html><meta charset='utf-8'><style>"
+                "@page{size:13.333in 7.5in;margin:0}"
+                "html,body{margin:0;padding:0}"
+                "section{width:1280px;height:720px;overflow:hidden;break-after:page;"
+                "page-break-after:always}"
+                "section:last-child{break-after:auto;page-break-after:auto}"
+                "img{display:block;width:1280px;height:720px}"
+                "</style>" + slides_html,
+                encoding="utf-8",
+            )
+            sheet = browser.new_page(viewport={"width": 1280, "height": 720})
+            sheet.goto(builder.as_uri(), wait_until="load")
+            sheet.wait_for_timeout(400)
+            sheet.pdf(
+                path=str(target),
+                width="13.333in",   # ровно 1280×720: картинка ложится страница в страницу
+                height="7.5in",
+                print_background=True,
+                margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+            )
+            browser.close()
+
     size = target.stat().st_size / 1024 / 1024
-    print(f"  threefast.pdf  {size:.1f} МБ")
+    print(f"  threefast.pdf  {total} страниц, {size:.1f} МБ")
     return True
 
 
@@ -163,7 +241,11 @@ def write_guide() -> None:
         "# ThreeFast — презентация защиты",
         "",
         "Открыть колоду: **`deck/threefast.html`** (двойной щелчок — откроется в браузере).",
-        "Готовый PDF для отправки: **`threefast.pdf`** — по одному слайду на страницу, 16:9.",
+        "Готовый PDF для отправки: **`threefast.pdf`** — 14 страниц 16:9, по слайду на страницу.",
+        "",
+        "PDF собран из изображений слайдов: так разбиение на страницы гарантированно",
+        "совпадает со слайдами. Текст в нём не выделяется — если нужен PDF с текстом,",
+        "откройте колоду в браузере и нажмите `Ctrl+P` → «Сохранить как PDF».",
         "",
         "## Управление",
         "",
@@ -204,12 +286,15 @@ def write_guide() -> None:
 def main() -> int:
     print("картинки:")
     made = shrink()
+    print("фото заведений:")
+    places = place_photos()
     print("QR:")
     has_qr = make_qr()
     write_guide()
 
     manifest = {
         "slides_images": made,
+        "place_photos": places,
         "qr": has_qr,
         "site": SITE,
         "files": sorted(path.name for path in DECK.rglob("*") if path.is_file()),
