@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class LoginRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=1, max_length=200)
+    # «Запомнить меня»: смена на планшете кухни не должна логиниться каждый день.
+    remember: bool = False
 
     @field_validator("username")
     @classmethod

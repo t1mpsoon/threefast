@@ -1,14 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Сканер заказов — {{ app_title }}{% endblock %}
 
-{% block nav %}
-  <a href="/staff">Очередь</a>
-  <a href="/scan" aria-current="page">Сканер</a>
-  <a href="/qr">QR-плакат</a>
-{% endblock %}
-
 {% block content %}
 <div class="stack scan">
+  {# Явный возврат: со сканера легко уехать вглубь и потерять панель. #}
+  <a class="back-link" href="{{ '/super' if current_user and current_user.can_manage_places else '/staff' }}">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+            stroke-linejoin="round"/>
+    </svg>
+    {{ 'К заведениям' if current_user and current_user.can_manage_places else 'К очереди заказов' }}
+  </a>
   <div>
     <h1 class="scan__title">Сканер заказов</h1>
     <p class="muted">Наведите камеру на QR-код в телефоне гостя: заказ откроется сразу, останется нажать «Выдать».</p>

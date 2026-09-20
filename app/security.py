@@ -71,9 +71,13 @@ def authenticate(db: Session, username: str, password: str) -> StaffUser | None:
 
 
 # ── JWT ─────────────────────────────────────────────────────────────────────
-def create_access_token(user: StaffUser) -> tuple[str, int]:
-    """Возвращает (токен, срок действия в минутах)."""
-    expires_minutes = settings.jwt_expire_minutes
+def create_access_token(user: StaffUser, *, minutes: int | None = None) -> tuple[str, int]:
+    """Возвращает (токен, срок действия в минутах).
+
+    `minutes` задаёт срок явно: вход с «запомнить меня» продлевает сессию
+    смены, чтобы планшет на кухне не просил логин каждый день.
+    """
+    expires_minutes = minutes or settings.jwt_expire_minutes
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user.id),

@@ -428,6 +428,23 @@
   window.addEventListener('load', moveTabbarPill);
   bindToTop();
 
+  /* ── Выход из смены ────────────────────────────────────────────────────── */
+
+  async function logout() {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch (_) { /* даже если связи нет, уходим на вход: cookie гасит сервер */ }
+    go('/login');
+  }
+
+  /* Кнопка выхода живёт в шапке всех страниц, поэтому обработчик общий. */
+  var logoutButton = document.getElementById('logout-button');
+  if (logoutButton) {
+    logoutButton.addEventListener('click', function () {
+      busy(logoutButton, 'Выходим', logout);
+    });
+  }
+
   window.EP = {
     apiFetch: apiFetch,
     ApiError: ApiError,
@@ -438,6 +455,7 @@
     plural: plural,
     countUp: countUp,
     go: go,
+    logout: logout,
     nudge: nudge,
     stagger: stagger,
     moveTabbarPill: moveTabbarPill,

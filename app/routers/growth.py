@@ -56,15 +56,17 @@ def page_qr(
             "posters": posters,
             "hall_tables": tables,
             "chosen_table": table,
-            **_runtime_flags(request),
+            **_runtime_flags(request, db),
         },
     )
 
 
 @router.get("/for-business", response_class=HTMLResponse, include_in_schema=False)
-def page_business(request: Request):
+def page_business(request: Request, db: Session = Depends(get_db)):
     """Лендинг для владельцев кафе: чем сервис помогает и сколько даёт."""
-    return templates.TemplateResponse(request, "business.html", {**_runtime_flags(request)})
+    return templates.TemplateResponse(
+        request, "business.html", {**_runtime_flags(request, db)}
+    )
 
 
 @router.get("/qr", include_in_schema=False)
@@ -124,4 +126,8 @@ def page_scan(request: Request, db: Session = Depends(get_db)):
     user = _current_user_or_redirect(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    return templates.TemplateResponse(request, "staff/scan.html", {"user": user})
+    return templates.TemplateResponse(
+        request,
+        "staff/scan.html",
+        {"user": user, **_runtime_flags(request, db)},
+    )

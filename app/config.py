@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     secret_key: str = _INSECURE_DEFAULT_SECRET
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
+    # «Запомнить меня» на входе в панель: столько дней живёт сессия смены.
+    # Планшет на кухне и телефон администратора не должны логиниться каждый день.
+    jwt_remember_days: int = Field(default=30, ge=1, le=365)
 
     # ── Бизнес-параметры ───────────────────────────────────────────────────
     default_slot_duration_minutes: int = Field(default=5, ge=1, le=240)

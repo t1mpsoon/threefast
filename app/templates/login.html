@@ -54,6 +54,17 @@
           <input type="password" id="password" autocomplete="current-password" required>
           <div class="field__error"></div>
         </div>
+
+        {# Смене важно не логиниться каждый день: планшет на кухне один на всех. #}
+        <label class="check">
+          <input type="checkbox" id="remember" checked>
+          <span>Запомнить меня на {{ remember_days }} дней</span>
+        </label>
+        <p class="tiny muted" style="margin:-6px 0 14px">
+          Снимите галочку на чужом устройстве — тогда сессия закончится через {{ session_hours }} ч.
+          Выйти можно в любой момент кнопкой в шапке.
+        </p>
+
         <button class="btn btn--flame btn--block" type="submit" id="login-button">Начать смену</button>
       </form>
 
@@ -90,7 +101,11 @@
         try {
           var who = await EP.apiFetch('/api/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ username: username, password: password })
+            body: JSON.stringify({
+              username: username,
+              password: password,
+              remember: document.getElementById('remember').checked
+            })
           });
           EP.say('Смена открыта: ' + who.username + ', роль — ' + who.role_title.toLowerCase() + '.',
                  'good', { sticky: true });

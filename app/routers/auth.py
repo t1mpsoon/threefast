@@ -1,4 +1,4 @@
-﻿"""Аутентификация персонала и администратора (JWT, раздел 2.14 ТЗ).
+"""Аутентификация персонала и администратора (JWT, раздел 2.14 ТЗ).
 
 Клиентский флоу регистрации не требует — логин/пароль нужен только
 сотрудникам заведения для доступа к панелям.
@@ -39,6 +39,8 @@ def login(
     """Проверяет логин/пароль и выдаёт JWT.
 
     Токен дублируется в httpOnly-cookie, чтобы HTML-панели работали без JS-хранилища.
+    С галочкой «запомнить меня» cookie живёт недели, а не часы: так планшет на
+    кухне и телефон администратора не просят логин каждую смену.
     """
     limiter_key = f"login:{client_ip(request)}"
     wait = login_limiter.retry_after(limiter_key)
@@ -51,7 +53,12 @@ def login(
         raise AuthenticationError("Неверный логин или пароль")
     login_limiter.reset(limiter_key)
 
-    token, expires_minutes = create_access_token(user)
+    minutes = (
+        settings.jwt_remember_days * 24 * 60
+        if payload.remember
+        else settings.jwt_expire_minutes
+    )
+    token, expires_minutes = create_access_token(user, minutes=minutes)
     response.set_cookie(
         key=TOKEN_COOKIE_NAME,
         value=token,

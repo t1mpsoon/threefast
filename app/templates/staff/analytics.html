@@ -1,17 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Сводка смены — {{ establishment.name }}{% endblock %}
 
-{% block nav %}
-  <a href="/staff">Очередь</a>
-  <a href="/admin">Меню и слоты</a>
-  <a href="/scan">Сканер</a>
-  <a href="/admin/analytics" aria-current="page">Сводка</a>
-  <a href="/e/{{ establishment.id }}/qr">QR-плакат</a>
-  <a href="#" id="analytics-out">Завершить смену</a>
-{% endblock %}
-
 {% block content %}
 <div class="stack" style="padding:16px 0 40px">
+  {# Одно меню на все панели — в шапке. Здесь только возврат к работе смены. #}
+  <a class="back-link" href="/staff">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+            stroke-linejoin="round"/>
+    </svg>
+    К панели смены
+  </a>
   <div class="row row--between">
     <div>
       <h1>Сводка</h1>
@@ -120,15 +119,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-  (function () {
-    var out = document.getElementById('analytics-out');
-    if (!out) return;
-    out.addEventListener('click', async function (event) {
-      event.preventDefault();
-      try { await EP.apiFetch('/api/auth/logout', { method: 'POST' }); } catch (_) { /* ignore */ }
-      window.location.href = '/login';
-    });
-  })();
-</script>
+{# Выход теперь общий — кнопка в шапке, отдельный обработчик не нужен. #}
 {% endblock %}

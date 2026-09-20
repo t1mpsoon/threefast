@@ -12,13 +12,19 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.config import BASE_DIR, settings
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.errors import AppError, AuthenticationError, NotFoundError, PermissionDeniedError
 from app.logging_utils import get_logger
 from app.models.enums import StaffRole
 from app.models.staff_user import StaffUser
 from app.repositories.menu_repository import EstablishmentRepository
-from app.security import TOKEN_COOKIE_NAME, get_current_user, require_admin
+from app.repositories.staff_repository import StaffRepository
+from app.security import (
+    TOKEN_COOKIE_NAME,
+    decode_access_token,
+    get_current_user,
+    require_admin,
+)
 from app.services.analytics_service import AnalyticsService
 from app.services.menu_service import MenuService
 from app.services.order_service import OrderService
@@ -84,6 +90,9 @@ templates.env.globals.update(
     current_year=lambda: local_today().year,
     max_days_ahead=settings.max_booking_days_ahead,
     static_version=STATIC_VERSION,
+    # Для страницы входа: сколько живёт сессия с галочкой и без неё.
+    remember_days=settings.jwt_remember_days,
+    session_hours=max(1, settings.jwt_expire_minutes // 60),
 )
 
 router = APIRouter(tags=["Страницы"])
@@ -96,21 +105,46 @@ def _first_establishment(db: Session):
     return establishment
 
 
-def _runtime_flags(request: Request) -> dict:
-    """Данные для шапки/подвала страницы."""
+def _runtime_flags(request: Request, db: Session | None = None) -> dict:
+    """Данные для шапки и подвала страницы.
+
+    Кроме факта входа отдаём самого сотрудника: шапка показывает, кто на смене,
+    и предлагает выход, а администратору сервиса — ссылку на заведения вместо
+    смены, куда его всё равно не пустят. Сессия берётся из cookie, поэтому
+    страницы остаются доступны без JS.
+    """
+    token = request.cookies.get(TOKEN_COOKIE_NAME)
+    user = None
+    if token:
+        session = db
+        opened = False
+        if session is None:
+            session = SessionLocal()
+            opened = True
+        try:
+            payload = decode_access_token(token)
+            user = StaffRepository(session).get(int(payload.get("sub", 0)))
+        except Exception:  # noqa: BLE001 — битый или просроченный токен: считаем гостем
+            user = None
+        finally:
+            if opened:
+                session.close()
+
     return {
-        "is_authenticated": bool(request.cookies.get(TOKEN_COOKIE_NAME)),
+        # Cookie без живого пользователя (истёк срок, аккаунт удалён) — это гость.
+        "is_authenticated": user is not None,
+        "current_user": user,
     }
 
 
 # ── Клиентский флоу ─────────────────────────────────────────────────────────
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
-def page_places(request: Request):
+def page_places(request: Request, db: Session = Depends(get_db)):
     """Главный экран: список заведений с фото, рейтингом и загрузкой кухни."""
     return templates.TemplateResponse(
         request,
         "places.html",
-        {**_runtime_flags(request)},
+        {**_runtime_flags(request, db)},
     )
 
 
@@ -127,7 +161,7 @@ def page_menu(establishment_id: int, request: Request, db: Session = Depends(get
             "categories": categories,
             "step": 1,
             "today": local_today().isoformat(),
-            **_runtime_flags(request),
+            **_runtime_flags(request, db),
         },
     )
 
@@ -185,7 +219,7 @@ def page_order_status(
                 if order is not None
                 else ""
             ),
-            **_runtime_flags(request),
+            **_runtime_flags(request, db),
         },
     )
 
@@ -228,6 +262,7 @@ def page_staff_queue(request: Request, db: Session = Depends(get_db)):
             "role_title": StaffRole(user.role).title,
             "today": local_today().isoformat(),
             "now": local_now(),
+            **_runtime_flags(request, db),
         },
     )
 
@@ -243,7 +278,11 @@ def page_super_places(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         request,
         "super/places.html",
-        {"user": user, "role_title": StaffRole(user.role).title},
+        {
+            "user": user,
+            "role_title": StaffRole(user.role).title,
+            **_runtime_flags(request, db),
+        },
     )
 
 
@@ -282,6 +321,7 @@ def page_admin_analytics(
             "period": period,
             "hourly_load": analytics_service.hourly_load(admin.establishment_id, local_today()),
             "today": local_today().isoformat(),
+            **_runtime_flags(request, db),
         },
     )
 
@@ -295,7 +335,8 @@ async def error_page(request: Request, exc: AppError) -> HTMLResponse:
         {
             "status_code": exc.status_code,
             "message": exc.message,
-            "is_authenticated": bool(request.cookies.get(TOKEN_COOKIE_NAME)),
+            # Ошибку видит и гость, и сотрудник: шапка должна знать, кто это.
+            **_runtime_flags(request),
         },
         status_code=exc.status_code,
     )

@@ -21,7 +21,7 @@
         href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/static/css/style.css?v={{ static_version }}">
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}{% if is_authenticated %} is-staff{% endif %}">
 <script>
   /* Оформление ставим до первой отрисовки: иначе светлая тема мигнёт. */
   (function () {
@@ -59,22 +59,35 @@
       <span class="brand__name">Three<span class="brand__accent">Fast</span></span>
     </a>
     <span class="top__gap"></span>
-    <nav class="top__nav" aria-label="Разделы">
+    <nav class="top__nav{% if is_authenticated %} top__nav--staff{% endif %}" aria-label="Разделы">
       {% block nav %}
-        <a href="/" {% if request.url.path == '/' %}aria-current="page"{% endif %}>
-          {% include "partials/icon_home.html" %}Заведения
-        </a>
-        <a href="/order" {% if request.url.path == '/order' %}aria-current="page"{% endif %}>Мой заказ</a>
         {% if is_authenticated %}
-          <a href="/staff">Смена</a>
-          <a href="/scan">Сканер</a>
-          <a href="/qr">QR-плакат</a>
+          {# Рабочее меню смены. Администратору сервиса «Смена» не нужна:
+             его всё равно переводит на заведения, и ссылка только путала. #}
+          {% if current_user and current_user.can_manage_places %}
+            <a href="/super" {% if request.url.path == '/super' %}aria-current="page"{% endif %}>Заведения</a>
+          {% else %}
+            <a href="/staff" {% if request.url.path == '/staff' %}aria-current="page"{% endif %}>Смена</a>
+          {% endif %}
+          <a href="/scan" {% if request.url.path == '/scan' %}aria-current="page"{% endif %}>Сканер</a>
+          <a href="/qr" {% if request.url.path.endswith('/qr') %}aria-current="page"{% endif %}>QR-плакат</a>
         {% else %}
+          <a href="/" {% if request.url.path == '/' %}aria-current="page"{% endif %}>
+            {% include "partials/icon_home.html" %}Заведения
+          </a>
+          <a href="/order" {% if request.url.path == '/order' %}aria-current="page"{% endif %}>Мой заказ</a>
           <a href="/for-business">Для заведений</a>
           <a href="/login">Вход</a>
         {% endif %}
       {% endblock %}
     </nav>
+    {% if is_authenticated and current_user %}
+      {# Кто на смене и выход. Раньше выйти можно было только из панели кухни. #}
+      <span class="top__who" title="Вы вошли как {{ current_user.username }}">
+        {{ current_user.username }}
+      </span>
+      <button class="top__out" type="button" id="logout-button">Выйти</button>
+    {% endif %}
     {# Оформление: светлое или тёмное. Выбор запоминается в браузере. #}
     <button class="shift shift-toggle" type="button" id="shift-toggle"
           aria-label="Переключить оформление">
