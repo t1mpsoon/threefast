@@ -30,6 +30,12 @@ services:
         value: production
       - key: APP_TITLE
         value: ThreeFast
+      # Часовой пояс заведений. Слоты — это «настенное» время точки
+      # (app/utils/time_utils.py), а контейнер Render по умолчанию живёт в UTC:
+      # без этой строки гости в Алматы видят время выдачи со сдвигом на 5 часов.
+      # Технические метки (created_at, ready_at) хранятся в UTC и не зависят от TZ.
+      - key: TZ
+        value: Asia/Almaty
       # Ссылка на базу подставляется из блока databases выше.
       - key: DATABASE_URL
         fromDatabase:
