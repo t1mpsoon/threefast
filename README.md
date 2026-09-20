@@ -357,7 +357,7 @@ express_pickup/
 │       └── js/                 # vanilla JS: корзина, табло, талон, кухня, админка
 ├── docs/design.md              # дизайн-система: палитра, шрифты, макет, фишка
 ├── migrations/                 # Alembic (начальная миграция 0001)
-├── tests/                      # pytest: 358 тестов
+├── tests/                      # pytest: 364 теста
 ├── tools/                      # только для разработки: снимки экранов, замеры, демо-данные
 ├── shots/                      # свежие снимки экранов (артефакт проверки)
 ├── data/                       # SQLite-файл (в .gitignore)
@@ -432,6 +432,7 @@ confirmed ──→ in_progress ──→ ready ──→ picked_up
 |---|---|
 | Заказ гостя (`/order`) | каждые 5 секунд, пока заказ в работе; опрос прекращается на `picked_up`, `cancelled`, `expired` и пока вкладка скрыта |
 | Экран успеха после оформления | тот же опрос — экран живой, а не статичная картинка «принят» |
+| Отменённый заказ | отдельный экран с крестиком, составом заказа и кнопкой «Заказать заново». Появляется и когда отменяет гость, и когда заказ снимает кухня |
 | Очередь кухни (`/staff`) | каждые 8 секунд, смена статуса — сразу, новый заказ отмечается звуком и плашкой |
 | Ответ `GET /api/orders/{code}/status` | `Cache-Control: no-store` — кэш браузера не покажет устаревший статус |
 
@@ -523,7 +524,7 @@ curl -X POST http://127.0.0.1:8000/api/orders \
 ## 10. Тестирование
 
 ```powershell
-venv\Scripts\python.exe -m pytest tests -q          # 358 тестов (~85 сек)
+venv\Scripts\python.exe -m pytest tests -q          # 364 теста (~85 сек)
 venv\Scripts\python.exe smoke_test.py              # сквозная проверка по HTTP
 venv\Scripts\python.exe check_migrations.py        # миграции совпадают с моделями
 
@@ -533,6 +534,7 @@ venv\Scripts\python.exe -m tools.check_scan_browser http://127.0.0.1:8000
 venv\Scripts\python.exe -m tools.check_sync_browser http://127.0.0.1:8000
 venv\Scripts\python.exe -m tools.check_table_browser http://127.0.0.1:8000
 venv\Scripts\python.exe -m tools.check_panel_browser http://127.0.0.1:8000
+venv\Scripts\python.exe -m tools.check_cancel_browser http://127.0.0.1:8000
 venv\Scripts\python.exe -m tools.visual_check http://127.0.0.1:8000
 ```
 
@@ -554,6 +556,7 @@ venv\Scripts\python.exe -m tools.visual_check http://127.0.0.1:8000
 | `tests/test_sync.py` | Связь кухни и гостя: живой экран успеха, запрет кэша, точный шаг шкалы, нет скриптов-сирот |
 | `tests/test_table_choice.py` | Выбор заведения и столика: плакат для любой точки, столик в заказе, догон схемы |
 | `tests/test_session.py` | Сессия смены: «запомнить меня», выход, шапка, возврат из вложенных страниц |
+| `tests/test_cancelled_order.py` | Экран отменённого заказа: крестик вместо галочки, состав заказа, нет шкалы и QR |
 
 Тесты используют временную БД и не затрагивают рабочие данные в `data/`.
 

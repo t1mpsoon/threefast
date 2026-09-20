@@ -179,6 +179,13 @@
 
     /* Словами — только о том, что реально поменялось. */
     if (known && known !== status) {
+      /* Заказ отменили или сняли с выдачи — показываем отдельный экран
+         с крестиком: его рисует сервер, чтобы разметка жила в одном месте. */
+      if (status === 'cancelled' || status === 'expired') {
+        if (window.EPSound) window.EPSound.play('tap');
+        EP.go('/order?code=' + encodeURIComponent(code));
+        return;
+      }
       var good = status === 'ready' || status === 'picked_up';
       EP.say('Заказ теперь: ' + (EXPLAIN[status] || status), good ? 'good' : 'warn',
              { title: 'Статус сменился' });
@@ -241,9 +248,10 @@
         try {
           var order = await EP.apiFetch('/api/orders/' + encodeURIComponent(code) + '/cancel',
             { method: 'POST' });
-          paint(order.status, order.status_tone, order.status_headline);
           stopped = true;
-          EP.say('Заказ отменён. Если передумаете — оформите новый.', 'info');
+          /* Уходим на экран отмены: он показывает и крестик, и состав заказа,
+             и что делать дальше. Обновлять карточку на месте — половинчато. */
+          EP.go('/order?code=' + encodeURIComponent(order.order_code || code));
         } catch (error) {
           EP.say(error.message, 'bad');
         }

@@ -6,7 +6,57 @@
 {% block title %}Мой заказ{% endblock %}
 
 {% block content %}
-{% if order and fresh %}
+{% if order and order.status in ('cancelled', 'expired') %}
+  {# Отменённый заказ — отдельный экран, а не карточка с погасшей шкалой:
+     гость должен сразу понять, что заказа нет, и что делать дальше.
+     Крестик отрисовывается так же, как галочка на экране успеха. #}
+  <div class="success success--lost" id="order-card" data-code="{{ order.order_code }}"
+       data-tone="{{ order.status_enum.tone }}">
+    <div class="success__mark success__mark--lost" aria-hidden="true">
+      <svg viewBox="0 0 52 52" fill="none">
+        <path class="cross-path" d="M18 18 34 34M34 18 18 34"/>
+      </svg>
+    </div>
+    <h1 data-role="headline">Заказ {{ order.order_code }} {{ order.status_enum.headline }}</h1>
+    <p class="muted" style="margin-top:8px" data-role="explain">{{ order.status_enum.hint }}</p>
+
+    <div class="panel" style="margin-top:22px;text-align:left">
+      <h3 style="margin-bottom:12px">Что было в заказе</h3>
+      <div class="summary">
+        {% for item in order.items %}
+          <div class="summary__row">
+            <span>{{ item.item_name_snapshot }} <span class="summary__qty">×{{ item.quantity }}</span></span>
+            <span>{{ item.line_total|money }}</span>
+          </div>
+        {% endfor %}
+        <div class="summary__row summary__total">
+          <span>Итого</span><span>{{ order.total_amount|money }}</span>
+        </div>
+        <div class="summary__row small muted">
+          <span>Заведение</span><span>{{ order.establishment.name if order.establishment else '' }}</span>
+        </div>
+        <div class="summary__row small muted">
+          <span>Время выдачи</span>
+          <span>{{ order.slot.slot_datetime|slot_time }} · {{ order.slot.slot_datetime|humanize_slot }}</span>
+        </div>
+      </div>
+      {% if order.status == 'expired' %}
+        <p class="muted small" style="margin-top:12px">
+          Заказ готовили, но забрать его вовремя не получилось: через 20 минут
+          после готовности он снимается с выдачи, чтобы не занимать полку.
+        </p>
+      {% endif %}
+    </div>
+
+    <div class="stack" style="margin-top:22px">
+      {% if order.establishment %}
+        <a class="btn btn--flame btn--block" href="/e/{{ order.establishment.id }}/menu">Заказать заново</a>
+      {% endif %}
+      <a class="btn btn--line btn--block" href="/order">Проверить другой заказ</a>
+      <a class="btn btn--line btn--block" href="/">К заведениям</a>
+    </div>
+  </div>
+{% elif order and fresh %}
   {# Экран успеха: галочка отрисовывается один раз, затем прогресс заказа.
      Экран живой: order_status.js ищет именно #order-card, и без него гость
      видел бы «принят» до перезагрузки, пока кухня уже готовит. #}
@@ -60,6 +110,11 @@
         </svg>
         Поделиться заказом
       </button>
+      {% if order.status in ("confirmed", "in_progress") %}
+      {# Отменить можно и сразу после оформления: гость мог ошибиться,
+         а кухня ещё не начала готовить. #}
+      <button class="btn btn--line btn--block" type="button" id="cancel-button">Отменить заказ</button>
+      {% endif %}
       <a class="btn btn--line btn--block" href="/">Заказать ещё</a>
     </div>
   </div>

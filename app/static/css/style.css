@@ -1890,6 +1890,16 @@ body.has-tabbar .foot { padding-bottom: 74px; }
   stroke-dasharray: 48; stroke-dashoffset: 48;
   animation: draw-check 560ms ease-out 120ms forwards;
 }
+/* Отменённый заказ: тот же экран, но с крестиком. Крестик рисуется теми же
+   двумя линиями по 22.6 модуля — отсюда 46 в штрихе. */
+.success__mark--lost { background: var(--flame-soft); }
+.cross-path {
+  stroke: var(--flame-dark); stroke-width: 4; fill: none;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 46; stroke-dashoffset: 46;
+  animation: draw-cross 520ms var(--ease-out) 120ms forwards;
+}
+@keyframes draw-cross { to { stroke-dashoffset: 0; } }
 @keyframes draw-check { to { stroke-dashoffset: 0; } }
 
 .success__code { font-size: 1.1rem; font-weight: 700; }
@@ -2191,7 +2201,7 @@ body:not(.has-tabbar) .to-top { bottom: 16px; }
   .skeleton::after { display: none; }
   .plus-one { display: none; }
   /* Галочка без дорисовки — сразу видна. */
-  .check-path, .progress__done-mark path { stroke-dashoffset: 0; }
+  .check-path, .cross-path, .progress__done-mark path { stroke-dashoffset: 0; }
   /* Скелетон остаётся просто серым блоком, без блика. */
   .skeleton { background: var(--cloud); }
   .cartbar { transform: none; }
