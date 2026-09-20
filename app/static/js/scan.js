@@ -41,7 +41,7 @@
   var INVERT_AFTER_MS = 1200;
 
   var stream = null, detector = null, canvas = null, running = false, paused = false, busy = false;
-  var wanted = false, nativeMisses = 0, lastHit = 0, jsqrLoading = null, needsGesture = false;
+  var wanted = false, nativeMisses = 0, lastHit = 0, jsqrLoading = null, starting = false;
 
   function esc(s) { return window.EP && EP.escapeHtml ? EP.escapeHtml(String(s)) : String(s).replace(/[&<>"]/g, ''); }
   function say(text, tone) { if (window.EP && EP.say) EP.say(text, tone || 'info'); }
@@ -160,53 +160,69 @@
   }
 
   async function startCamera() {
+    /* Защита от двойного запуска: пока камера поднимается, повторное нажатие
+       кнопки поднимало второй поток и ломало первый (play() падал с AbortError,
+       и сканер оставался ни с чем). */
+    if (starting || running || stream) return;
+    starting = true;
     wanted = true;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showNoCamera('Браузер не даёт доступ к камере. Загрузите фото QR или введите номер.');
-      return;
-    }
-    cam.hidden = false;
-    toggle.textContent = 'Выключить камеру';
-    say2('Включаем камеру…');
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
-      });
-    } catch (error) {
-      showNoCamera(cameraProblem(error));
-      return;
-    }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showNoCamera('Браузер не даёт доступ к камере. Загрузите фото QR или введите номер.');
+        return;
+      }
+      cam.hidden = false;
+      toggle.textContent = 'Выключить камеру';
+      say2('Включаем камеру…');
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+      } catch (error) {
+        showNoCamera(cameraProblem(error));
+        return;
+      }
 
-    /* Непрерывная фокусировка: без неё камера телефона часто не наводится
-       на экран в упор. Браузеры, которые этого не умеют, просто не ответят. */
-    var track = stream.getVideoTracks && stream.getVideoTracks()[0];
-    if (track && track.applyConstraints) {
-      try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (_) { /* не поддерживается */ }
-    }
+      /* Непрерывная фокусировка: без неё камера телефона часто не наводится
+         на экран в упор. Браузеры, которые этого не умеют, просто не ответят. */
+      var track = stream.getVideoTracks && stream.getVideoTracks()[0];
+      if (track && track.applyConstraints) {
+        try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (_) { /* не поддерживается */ }
+      }
 
-    video.srcObject = stream;
-    try {
-      await video.play();
-      needsGesture = false;
-    } catch (_) {
-      /* iOS и часть встроенных браузеров не запускают поток без касания. */
-      needsGesture = true;
-    }
+      video.srcObject = stream;
+      var playing = true;
+      try {
+        await video.play();
+      } catch (_) {
+        /* Первая попытка могла не успеть за потоком — повторяем один раз. */
+        try {
+          await new Promise(function (done) { window.setTimeout(done, 250); });
+          await video.play();
+        } catch (_) { playing = false; }
+      }
 
-    var ok = await prepareDecoder();
-    if (!ok) {
-      say2('Этот браузер не умеет читать QR. Загрузите фото QR или введите номер.');
-      return;
+      /* Декодер готовим до проверки потока: если браузер не умеет читать QR,
+         незачем держать включённой камеру. */
+      var ok = await prepareDecoder();
+      if (!ok) {
+        showNoCamera('Этот браузер не умеет читать QR. Загрузите фото QR или введите номер.');
+        return;
+      }
+      if (!playing) {
+        /* Браузер не запускает картинку без касания (так делает iOS).
+           Камеру отпускаем: следующее нажатие поднимет её уже из жеста. */
+        showNoCamera('Нажмите «Включить камеру» — браузер ждёт касания.');
+        return;
+      }
+      running = true;
+      lastHit = Date.now();
+      say2('Наведите на QR-код гостя');
+      loop();
+    } finally {
+      starting = false;
     }
-    if (needsGesture) {
-      say2('Нажмите «Включить камеру» ещё раз, чтобы запустить картинку');
-      return;
-    }
-    running = true;
-    lastHit = Date.now();
-    say2('Наведите на QR-код гостя');
-    loop();
   }
 
   function stopCamera() {
@@ -220,6 +236,7 @@
     wanted = false;
     cam.hidden = true;
     toggle.textContent = 'Включить камеру';
+    say2(text);
     say(text, 'warn');
   }
 
