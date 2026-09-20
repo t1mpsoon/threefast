@@ -20,6 +20,7 @@ class SlotOut(BaseModel):
     # Доп. поля для UI: почему слот недоступен.
     is_too_soon: bool = False
     label: str = ""
+    discount_percent: int = 0
 
     @property
     def time_label(self) -> str:

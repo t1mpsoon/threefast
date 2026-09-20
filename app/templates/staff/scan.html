@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Сканер заказов — {{ app_title }}{% endblock %}
+
+{% block nav %}
+  <a href="/staff">Очередь</a>
+  <a href="/scan" aria-current="page">Сканер</a>
+  <a href="/qr">QR-плакат</a>
+{% endblock %}
+
+{% block content %}
+<div class="stack scan">
+  <div>
+    <h1 class="scan__title">Сканер заказов</h1>
+    <p class="muted">Наведите камеру на QR-код в телефоне гостя: заказ откроется сразу, останется нажать «Выдать».</p>
+  </div>
+
+  <div class="scan__cam" id="scan-cam" hidden>
+    <video id="scan-video" playsinline muted></video>
+    <span class="scan__frame" aria-hidden="true"></span>
+    <div class="scan__hint" id="scan-hint" role="status"></div>
+  </div>
+  <button class="btn btn--line" type="button" id="scan-toggle">Включить камеру</button>
+
+  <form class="scan__manual" id="scan-form" novalidate>
+    <label for="scan-input">Не читается? Введите номер заказа</label>
+    <div class="scan__row">
+      <input id="scan-input" name="code" placeholder="EX-3467" autocomplete="off"
+             autocapitalize="characters" spellcheck="false" maxlength="12">
+      <button class="btn btn--flame" type="submit">Найти</button>
+    </div>
+  </form>
+
+  <div id="scan-result" aria-live="polite"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/scan.js?v={{ static_version }}"></script>
+{% endblock %}

@@ -78,8 +78,6 @@ def create_access_token(user: StaffUser) -> tuple[str, int]:
     payload = {
         "sub": str(user.id),
         "username": user.username,
-        "role": user.role,
-        "establishment_id": user.establishment_id,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
     }

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Для заведений — {{ app_title }}{% endblock %}
+{% block content %}
+<div class="stack biz">
+  <section class="biz__hero">
+    <h1>Уберите очередь.<br>Продавайте больше в час пик.</h1>
+    <p>Гости заказывают заранее к точной минуте. Кухня готовит ровно ко времени, а зал не забит ожиданием.</p>
+    <div class="biz__cta">
+      <a class="btn btn--flame" href="/">Посмотреть, как видит гость</a>
+      <a class="btn btn--line" href="/login">Вход для заведений</a>
+    </div>
+  </section>
+
+  <section class="biz__grid">
+    <article><h3>Нагрузка под контролем</h3><p>Лимит заказов на каждую минуту: кухня не захлёбывается, пик распределяется.</p></article>
+    <article><h3>Скидка вне пика</h3><p>Гость сам выбирает спокойное время, потому что там дешевле. Вы загружаете кухню равномернее.</p></article>
+    <article><h3>Без приложения</h3><p>QR на столе — и заказ за три шага. Без регистрации, гость не теряется на входе.</p></article>
+    <article><h3>Постоянные гости</h3><p>«Как в прошлый раз» в один тап: заказ повторяется быстрее, чем стоит очередь.</p></article>
+  </section>
+
+  <section class="biz__calc" id="calc">
+    <h2>Сколько времени вы вернёте гостям</h2>
+    <label>Заказов в день <input id="calc-orders" type="number" min="10" max="5000" value="200"></label>
+    <label>Средняя очередь, мин <input id="calc-wait" type="number" min="1" max="30" value="8"></label>
+    <label>Доля тех, кто закажет заранее, % <input id="calc-share" type="number" min="5" max="100" value="40"></label>
+    <p class="biz__result">Гости сэкономят <b id="calc-out">0</b> часов в день, а вы освободите кассу в самые загруженные часы.</p>
+    <p class="muted small">Оценка по введённым вами числам, не гарантия результата.</p>
+  </section>
+
+  <section class="biz__grid">
+    <article><h3>1. Мы заводим точку</h3><p>Название, часы работы, лимит заказов на слот и меню.</p></article>
+    <article><h3>2. Печатаете QR</h3><p>Плакат создаётся на странице заведения: страница «QR-плакат» в панели заведения.</p></article>
+    <article><h3>3. Кухня видит очередь</h3><p>Заказы по минутам, звук о новом заказе, отметка «готов».</p></article>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var ids = ['calc-orders', 'calc-wait', 'calc-share'];
+    function calc() {
+      var v = ids.map(function (i) { return Number(document.getElementById(i).value) || 0; });
+      var hours = v[0] * (v[2] / 100) * v[1] / 60;
+      document.getElementById('calc-out').textContent = hours.toFixed(1).replace('.', ',');
+    }
+    ids.forEach(function (i) { document.getElementById(i).addEventListener('input', calc); });
+    calc();
+  })();
+</script>
+{% endblock %}

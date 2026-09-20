@@ -14,6 +14,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 _INSECURE_DEFAULT_SECRET = "change_me_to_random_value"
 
+# Ephemeral ключ для development: генерируется один раз на старт процесса,
+# не мутирует Pydantic-модель и безопасен при нескольких воркерах uvicorn.
+_DEV_SECRET_KEY: str | None = None
+
+
+def _get_dev_secret() -> str:
+    """Возвращает (и при необходимости создаёт) однопроцессный dev-ключ."""
+    global _DEV_SECRET_KEY
+    if _DEV_SECRET_KEY is None:
+        _DEV_SECRET_KEY = secrets.token_urlsafe(48)
+    return _DEV_SECRET_KEY
+
 
 class Settings(BaseSettings):
     """Настройки из .env. Все секреты — только здесь, в коде их нет (раздел 2.14 ТЗ)."""
@@ -49,6 +61,10 @@ class Settings(BaseSettings):
 
     # ── Ограничения корзины и анти-спам ────────────────────────────────────
     rate_limit_orders_per_minute: int = Field(default=5, ge=1, le=1000)
+    # Скидка на «спокойное» время: вне часов пик. 0 — выключено.
+    offpeak_discount_percent: int = Field(default=10, ge=0, le=50)
+    # Часы пик, полный формат: «12-14,18-20» (конец не включается).
+    peak_hours: str = "12-14,18-20"
     max_quantity_per_item: int = Field(default=20, ge=1, le=100)
     max_distinct_items_per_order: int = Field(default=15, ge=1, le=100)
 
@@ -130,8 +146,8 @@ class Settings(BaseSettings):
     def ensure_secret_key(self) -> str:
         """Гарантирует наличие рабочего SECRET_KEY.
 
-        В development при отсутствии ключа он генерируется на время процесса
-        (с предупреждением). В production небезопасное значение — фатальная ошибка.
+        В development при отсутствии ключа он генерируется один раз на старте
+        процесса (с предупреждением). В production небезопасное значение — фатальная ошибка.
         """
         if self.secret_key and self.secret_key != _INSECURE_DEFAULT_SECRET:
             return self.secret_key
@@ -140,8 +156,7 @@ class Settings(BaseSettings):
                 "SECRET_KEY не задан. Укажите надёжный ключ в .env перед запуском "
                 "в production (python -c \"import secrets; print(secrets.token_urlsafe(48))\")"
             )
-        self.secret_key = secrets.token_urlsafe(48)
-        return self.secret_key
+        return _get_dev_secret()
 
 
 @lru_cache(maxsize=1)

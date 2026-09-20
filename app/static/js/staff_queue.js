@@ -160,4 +160,5 @@
   load();
   window.setInterval(tick, 1000);
   window.setInterval(load, RELOAD_MS);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
 })();

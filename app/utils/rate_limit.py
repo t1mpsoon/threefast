@@ -26,7 +26,7 @@ class RateLimiter:
         """Возвращает (разрешено, секунд_до_освобождения)."""
         moment = time.monotonic() if now is None else now
         with self._lock:
-            if len(self._events) > 5000:
+            if len(self._events) > 1000:
                 self._prune(moment)
             bucket = self._events[key]
             threshold = moment - self.window_seconds
@@ -52,6 +52,8 @@ class RateLimiter:
         """
         moment = time.monotonic() if now is None else now
         with self._lock:
+            if len(self._events) > 1000:
+                self._prune(moment)
             bucket = self._events[key]
             threshold = moment - self.window_seconds
             while bucket and bucket[0] <= threshold:

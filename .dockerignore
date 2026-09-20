@@ -1,0 +1,8 @@
+venv/
+.venv/
+__pycache__/
+logs/
+dist/
+shots/
+presentation/
+*.zip

@@ -12,7 +12,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -127,12 +128,25 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.add_middleware(GZipMiddleware, minimum_size=800)
+
+    @app.middleware("http")
+    async def _security_headers(request: Request, call_next):
+        """Базовые заголовки безопасности + кэш статики."""
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        if request.url.path.startswith("/static/") and "v=" in request.url.query:
+            response.headers["Cache-Control"] = "public, max-age=604800"
+        return response
+
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     # ── Роуты ──────────────────────────────────────────────────────────────
     from app.routers import auth, menu, orders, places, slots, staff, super_admin
-    from app.routers import public_pages
+    from app.routers import growth, public_pages
 
     app.include_router(places.router)
     app.include_router(menu.router)
@@ -141,6 +155,7 @@ def create_app() -> FastAPI:
     app.include_router(super_admin.router)
     app.include_router(auth.router)
     app.include_router(staff.router)
+    app.include_router(growth.router)
     app.include_router(public_pages.router)
 
     _register_error_handlers(app)
@@ -215,6 +230,67 @@ app = create_app()
 @app.get("/health", tags=["Служебные"], summary="Проверка работоспособности")
 def health() -> dict:
     return {"status": "ok", "app": settings.app_title, "env": settings.app_env}
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def manifest() -> JSONResponse:
+    """PWA-манифест: сайт ставится на экран телефона как приложение."""
+    return JSONResponse(
+        {
+            "name": settings.app_title,
+            "short_name": "ThreeFast",
+            "description": "Предзаказ еды к точному времени без очереди",
+            "start_url": "/",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#FF4F32",
+            "lang": "ru",
+            "icons": [
+                {"src": "/static/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                {"src": "/static/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                {"src": "/static/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+            ],
+        },
+        media_type="application/manifest+json",
+    )
+
+
+SW_JS = """
+const CACHE = 'threefast-shell-v2';
+self.addEventListener('install', (e) => { self.skipWaiting(); });
+self.addEventListener('activate', (e) => { e.waitUntil(self.clients.claim()); });
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/order';
+  e.waitUntil(self.clients.matchAll({ type: 'window' }).then((list) => {
+    for (const c of list) { if ('focus' in c) return c.focus(); }
+    return self.clients.openWindow(url);
+  }));
+});
+self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
+  // Сеть в приоритете; при обрыве отдаём последнюю сохранённую копию страницы или файла.
+  e.respondWith(
+    fetch(e.request).then((res) => {
+      if (res.ok && (url.pathname.startsWith('/static/') || e.request.mode === 'navigate')) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy));
+      }
+      return res;
+    }).catch(() => caches.match(e.request).then((hit) => hit || new Response(
+      'Нет соединения. Проверьте интернет и обновите страницу.',
+      { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })))
+  );
+});
+"""
+
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker() -> Response:
+    """Service worker: нужен для установки как приложения и работы при обрыве связи."""
+    return Response(SW_JS, media_type="text/javascript", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/favicon.ico", include_in_schema=False)

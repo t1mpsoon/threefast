@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}QR-плакат — {{ establishment.name }}{% endblock %}
+{% block content %}
+<div class="stack qr-page">
+  <div class="qr-tools no-print">
+    <h1>QR-плакат</h1>
+    <p class="muted">Распечатайте и поставьте на кассе или столы. Гость сканирует камерой телефона — приложение не нужно.</p>
+    <form method="get" class="qr-form">
+      <label>Плакатов по столам
+        <input type="number" name="tables" min="0" max="60" value="{{ posters|length if posters[0].label else 0 }}">
+      </label>
+      <button class="btn btn--sm" type="submit">Обновить</button>
+      <button class="btn btn--sm btn--line" type="button" onclick="window.print()">Печать</button>
+    </form>
+    <p class="muted small">Ссылка с меткой стола (<code>?src=tableN</code>) позволит потом видеть, какие столы заказывают чаще.</p>
+  </div>
+  <div class="qr-sheet">
+    {% for p in posters %}
+    <section class="qr-poster">
+      <div class="qr-poster__name">{{ establishment.name }}</div>
+      <h2>Закажите заранее —<br>заберите без очереди</h2>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=0&data={{ p.url|urlencode }}"
+           width="260" height="260" alt="QR-код для заказа">
+      <ol class="qr-poster__steps"><li>Наведите камеру</li><li>Выберите блюда и время</li><li>Назовите код на выдаче</li></ol>
+      {% if p.label %}<div class="qr-poster__table">{{ p.label }}</div>{% endif %}
+    </section>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

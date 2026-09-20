@@ -5,11 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}{{ app_title }}{% endblock %}</title>
   <meta name="theme-color" content="#FF4F32">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ThreeFast">
+  <meta property="og:title" content="{% block og_title %}ThreeFast — обед без ожидания{% endblock %}">
+  <meta property="og:description" content="Закажите заранее к точной минуте и заберите без очереди. Вне часов пик — дешевле.">
+  <meta property="og:image" content="{{ request.base_url }}static/img/icon-512.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="description" content="ThreeFast — закажите еду заранее и заберите без очереди">
+  <link rel="apple-touch-icon" href="/static/img/icon-192.png">
   <link rel="icon" href="/static/img/mark.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/static/css/style.css?v={{ static_version }}">
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -58,8 +67,11 @@
         <a href="/order" {% if request.url.path == '/order' %}aria-current="page"{% endif %}>Мой заказ</a>
         {% if is_authenticated %}
           <a href="/staff">Смена</a>
+          <a href="/scan">Сканер</a>
+          <a href="/qr">QR-плакат</a>
         {% else %}
-          <a href="/login">Для персонала</a>
+          <a href="/for-business">Для заведений</a>
+          <a href="/login">Вход</a>
         {% endif %}
       {% endblock %}
     </nav>
@@ -110,6 +122,13 @@
     document.documentElement.classList.add('has-view-transitions');
   })();
 </script>
+<script src="/static/js/dialog.js?v={{ static_version }}"></script>
 {% block scripts %}{% endblock %}
+<script src="/static/js/nudges.js?v={{ static_version }}"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+  }
+</script>
 </body>
 </html>

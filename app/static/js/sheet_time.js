@@ -201,11 +201,18 @@
     paintConfirm();
   }
 
+  function discountOf(iso) {
+    var found = 0;
+    slots.forEach(function (s) { if (s.slot_datetime.slice(0, 16) === String(iso).slice(0, 16)) found = s.discount_percent || 0; });
+    return found;
+  }
+
   function paintConfirm() {
     var ready = Boolean(picked) && minute !== null;
     confirmBtn.disabled = !ready;
     confirmBtn.textContent = ready
-      ? 'Подтвердить · ' + humanDay(day).toLowerCase() + ', ' + hour + ':' + minute
+      ? 'Подтвердить · ' + humanDay(day).toLowerCase() + ', ' + hour + ':' + minute +
+        (discountOf(picked) ? ' · −' + discountOf(picked) + '%' : '')
       : 'Подтвердить время';
   }
 
@@ -248,7 +255,8 @@
     drumWrap.hidden = false;
     loading.hidden = true;
     sumOut.textContent = available.length + ' ' +
-      EP.plural(available.length, 'минута', 'минуты', 'минут') + ' свободно';
+      EP.plural(available.length, 'минута', 'минуты', 'минут') + ' свободно' +
+      (available.some(function (s) { return s.discount_percent; }) ? ' · вне часов пик дешевле' : '');
 
     /* Стартуем с ближайшего доступного времени: это то, что чаще всего нужно. */
     var first = available[0];
@@ -349,7 +357,7 @@
 
   confirmBtn.addEventListener('click', function () {
     if (!picked || minute === null) return;
-    Cart.setMinute(picked, humanDay(day) + ', ' + hour + ':' + minute);
+    Cart.setMinute(picked, humanDay(day) + ', ' + hour + ':' + minute, discountOf(picked));
     sheet.close();
     /* Шторка времени закрывается — сразу открываем оформление. */
     window.setTimeout(function () {

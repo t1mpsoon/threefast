@@ -102,8 +102,11 @@ class AnalyticsService:
 
         # Заказы cancelled/expired не искажают среднее время ожидания,
         # но учитываются отдельно как «потерянные» (edge case Ф-9).
+        # Оба статуса исключаются из orders_count, чтобы не было двойного счёта
+        # со счётчиком lost_orders_count.
         active_orders = [
-            order for order in orders if order.status != OrderStatus.CANCELLED.value
+            order for order in orders
+            if order.status not in {OrderStatus.CANCELLED.value, OrderStatus.EXPIRED.value}
         ]
         result.orders_count = len(active_orders)
         result.lost_orders_count = sum(

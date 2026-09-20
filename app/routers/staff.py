@@ -187,11 +187,11 @@ def delete_menu_item(
     item = service.menu.get(menu_item_id)
     if item is None or item.establishment_id != admin.establishment_id:
         raise NotFoundError("Блюдо не найдено")
-    _, deleted = service.delete_item(menu_item_id)
+    updated_item, deleted = service.delete_item(menu_item_id)
     return {
         "menu_item_id": menu_item_id,
         "deleted": deleted,
-        "is_active": item.is_active,
+        "is_active": updated_item.is_active,
         "message": "Блюдо удалено из меню" if deleted else "Блюдо скрыто из меню (есть в заказах)",
     }
 
@@ -459,4 +459,58 @@ def analytics(
         throughput_growth_percent=report.throughput_growth_percent,
         capacity_per_hour=report.capacity_per_hour,
         message=report.message,
+    )
+
+
+# ── Сканер QR: поиск заказа по коду и смена статуса ─────────────────────────
+def _order_for_scan(code: str, user: StaffUser, db: Session):
+    """Заказ по коду из QR. Кухня видит только свои заказы, супер-админ — любые."""
+    from app.utils.codes import is_valid_order_code, normalize_order_code
+
+    if not is_valid_order_code(code):
+        raise InputError("Это не похоже на номер заказа. Номер выглядит так: EX-3467")
+    order = OrderService(db).get_order_by_code(normalize_order_code(code))
+    if not user.is_super and order.establishment_id != user.establishment_id:
+        # Чужой заказ не раскрываем: для кухни его как будто нет.
+        raise NotFoundError("Заказ с таким номером в вашем заведении не найден")
+    return order
+
+
+@router.get(
+    "/orders/by-code/{code}",
+    response_model=StaffOrderOut,
+    summary="Найти заказ по коду (для сканера QR)",
+)
+def find_order_by_code(
+    code: str,
+    user: StaffUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> StaffOrderOut:
+    return order_to_staff_schema(_order_for_scan(code, user, db))
+
+
+@router.patch(
+    "/orders/by-code/{code}/status",
+    response_model=StatusUpdateResponse,
+    summary="Изменить статус заказа по коду (для сканера QR)",
+)
+def change_status_by_code(
+    code: str,
+    payload: StatusUpdateRequest,
+    user: StaffUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> StatusUpdateResponse:
+    order = _order_for_scan(code, user, db)
+    updated = OrderService(db).change_status(
+        order.id,
+        payload.new_status,
+        expected_version=payload.version,
+        establishment_id=order.establishment_id,
+    )
+    return StatusUpdateResponse(
+        order_id=updated.id,
+        order_code=updated.order_code,
+        status=updated.status,
+        status_title=updated.status_enum.title,
+        version=updated.version,
     )

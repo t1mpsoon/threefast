@@ -79,7 +79,7 @@ class SlotRepository:
             return found
         return slot
 
-    def try_reserve(self, establishment_id: int, slot_datetime: datetime, capacity: int) -> TimeSlot:
+    def try_reserve(self, establishment_id: int, slot_datetime: datetime, capacity: int) -> TimeSlot | None:
         """Атомарно резервирует место в слоте (правило А-2).
 
         Проверка `booked_count < capacity` и увеличение счётчика выполняются одним
@@ -96,7 +96,7 @@ class SlotRepository:
             .values(booked_count=TimeSlot.booked_count + 1)
         )
         if result.rowcount == 0:
-            return None  # type: ignore[return-value]
+            return None
         self.db.expire(slot, ["booked_count"])
         self.db.refresh(slot)
         return slot

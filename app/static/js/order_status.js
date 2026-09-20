@@ -9,6 +9,17 @@
   var share = document.getElementById('share-button');
   var EVERY_MS = 15000;
 
+  /* QR заказа: рисуется в браузере, без внешних сервисов. */
+  var qrBox = document.getElementById('order-qr');
+  var qrImg = document.getElementById('order-qr-img');
+  if (qrBox && qrImg && window.EPQR) {
+    try {
+      qrImg.innerHTML = window.EPQR.svg(
+        window.location.origin + '/order?code=' + encodeURIComponent(qrBox.dataset.code),
+        { size: 168, label: 'QR-код заказа ' + qrBox.dataset.code });
+    } catch (_) { qrBox.hidden = true; }
+  }
+
   var STEP = { confirmed: 1, in_progress: 2, ready: 3, picked_up: 4 };
   var EXPLAIN = {
     confirmed: 'Кухня приняла заказ и начнёт готовить к вашей минуте.',
@@ -46,6 +57,43 @@
         EP.say('Скопируйте ссылку из адресной строки — она ведёт на этот заказ.', 'info');
       }
     });
+  }
+
+  var calBtn = document.getElementById('calendar-button');
+  if (calBtn) {
+    /* Файл .ics открывается в любом календаре: напоминание за 15 минут. */
+    calBtn.addEventListener('click', function () {
+      var d = calBtn.dataset, start = d.start;
+      var end = new Date(new Date(d.iso).getTime() + 15 * 60000);
+      var pad = function (n) { return String(n).padStart(2, '0'); };
+      var endStr = end.getFullYear() + pad(end.getMonth() + 1) + pad(end.getDate()) + 'T' +
+        pad(end.getHours()) + pad(end.getMinutes()) + '00';
+      var ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ThreeFast//RU', 'BEGIN:VEVENT',
+        'UID:' + d.code + '@threefast', 'DTSTAMP:' + start + 'Z',
+        'DTSTART:' + start, 'DTEND:' + endStr,
+        'SUMMARY:Заказ ' + d.code + ' — ' + d.place, 'LOCATION:' + (d.address || d.place),
+        'BEGIN:VALARM', 'TRIGGER:-PT15M', 'ACTION:DISPLAY', 'DESCRIPTION:Скоро выдача заказа', 'END:VALARM',
+        'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+      a.download = 'zakaz-' + d.code + '.ics';
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+
+    /* Живой отсчёт до выдачи под временем. */
+    var minuteEl = card && card.querySelector('[data-role="minute"]');
+    if (minuteEl) {
+      var eta = document.createElement('div');
+      eta.className = 'muted small eta';
+      minuteEl.parentNode.appendChild(eta);
+      var tickEta = function () {
+        var mins = Math.round((new Date(calBtn.dataset.iso).getTime() - Date.now()) / 60000);
+        eta.textContent = mins > 1 ? 'Через ' + mins + ' ' + EP.plural(mins, 'минуту', 'минуты', 'минут')
+          : mins >= -1 ? 'Пора идти за заказом' : '';
+      };
+      tickEta();
+      window.setInterval(tickEta, 30000);
+    }
   }
 
   if (!card) return;
@@ -118,6 +166,8 @@
       });
     }
 
+    if (qrBox) qrBox.hidden = !(status === 'confirmed' || status === 'in_progress' || status === 'ready');
+
     var explain = card.querySelector('[data-role="explain"]');
     if (explain) explain.textContent = EXPLAIN[status] || '';
 
@@ -132,6 +182,14 @@
       var plate = card.querySelector('.code-plate');
       if (plate) EP.nudge(plate, 'is-updated');
       if (window.EPSound) window.EPSound.play(good ? 'status' : 'tap');
+      if (status === 'ready' && window.EPDialog && !document.hidden && !EPDialog.isOpen()) {
+        EPDialog.open({ icon: '🎉', title: 'Заказ готов!', text: 'Назовите этот номер на выдаче:', code: code,
+          actions: [{ label: 'Иду забирать', kind: 'primary' }] });
+      }
+      if (window.EPNotify && (status === 'ready' || status === 'in_progress')) {
+        window.EPNotify.show(status === 'ready' ? 'Заказ готов! 🍽' : 'Заказ готовится',
+          (status === 'ready' ? 'Назовите номер ' : 'Номер ') + code, code);
+      }
     }
     known = status;
   }
@@ -146,8 +204,11 @@
   }
 
   if (cancel) {
-    cancel.addEventListener('click', function () {
-      if (!window.confirm('Отменить заказ? Кухня может уже начать готовить.')) return;
+    cancel.addEventListener('click', async function () {
+      var sure = window.EPDialog
+        ? await EPDialog.confirm({ icon: '⚠️', title: 'Отменить заказ?', text: 'Кухня могла уже начать готовить. Отмену нельзя вернуть.', ok: 'Да, отменить', cancel: 'Оставить заказ', danger: true })
+        : window.confirm('Отменить заказ? Кухня может уже начать готовить.');
+      if (!sure) return;
       EP.busy(cancel, 'Отменяем', async function () {
         try {
           var order = await EP.apiFetch('/api/orders/' + encodeURIComponent(code) + '/cancel',
@@ -162,6 +223,10 @@
   }
 
   window.setInterval(refresh, EVERY_MS);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+  if (window.EPNotify && known && known !== 'picked_up' && known !== 'cancelled' && known !== 'expired') {
+    window.EPNotify.ask(card);
+  }
 
   /* Первый прогон заполнения — чтобы полоса «налилась» при открытии экрана. */
   if (tracker) {

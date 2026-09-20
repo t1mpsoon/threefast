@@ -15,6 +15,23 @@ from app.repositories.slot_repository import SlotRepository
 from app.utils.time_utils import combine, format_slot, local_now, round_up_to_step
 
 
+def discount_percent_for(moment: datetime) -> int:
+    """Скидка (%) на выдачу в это время: вне часов пик — off-peak, в пик — 0."""
+    from app.config import settings
+
+    percent = settings.offpeak_discount_percent
+    if not percent:
+        return 0
+    for part in settings.peak_hours.split(","):
+        try:
+            start, end = (int(x) for x in part.strip().split("-"))
+        except ValueError:
+            continue
+        if start <= moment.hour < end:
+            return 0
+    return percent
+
+
 @dataclass(slots=True)
 class SlotView:
     """Представление слота для UI и API."""
@@ -28,6 +45,10 @@ class SlotView:
     @property
     def free_places(self) -> int:
         return max(self.capacity - self.booked_count, 0)
+
+    @property
+    def discount_percent(self) -> int:
+        return discount_percent_for(self.slot_datetime) if self.available else 0
 
     @property
     def label(self) -> str:
@@ -97,7 +118,7 @@ class SlotService:
             end += timedelta(days=1)
         moments: list[datetime] = []
         cursor = start
-        while cursor <= end:
+        while cursor < end:
             moments.append(cursor)
             cursor += timedelta(minutes=step)
         return moments
@@ -217,7 +238,7 @@ def slot_times_of_day(establishment: Establishment, day: date) -> list[time]:
         end += timedelta(days=1)
     result: list[time] = []
     cursor = start
-    while cursor <= end:
+    while cursor < end:
         result.append(cursor.time())
         cursor += timedelta(minutes=step)
     return result

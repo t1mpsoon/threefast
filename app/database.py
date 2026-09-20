@@ -48,12 +48,17 @@ class UTCDateTime(TypeDecorator):
 
 def _ensure_sqlite_directory(url: str) -> None:
     """Создаёт папку data/ до открытия файла БД, иначе SQLite не стартует."""
-    prefix = "sqlite:///"
-    if not url.startswith(prefix) or ":memory:" in url:
+    from urllib.parse import urlparse
+
+    if not url.startswith("sqlite:///") or ":memory:" in url:
         return
-    raw_path = url[len(prefix) :]
-    if raw_path.startswith("/") and len(raw_path) > 2 and raw_path[2] == ":":
-        raw_path = raw_path[1:]  # sqlite:///C:/... -> C:/...
+
+    parsed = urlparse(url)
+    # urlparse возвращает path вида '/./data/db.sqlite' или '/C:/data/db.sqlite' (Windows).
+    raw_path = parsed.path
+    # Убираем ведущий '/' у Windows-путей вида /C:/...
+    if len(raw_path) > 2 and raw_path[0] == "/" and raw_path[2] == ":":
+        raw_path = raw_path[1:]
     db_path = Path(raw_path)
     target = db_path if db_path.is_absolute() else (BASE_DIR / db_path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -105,6 +110,9 @@ def get_db() -> Iterator[Session]:
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

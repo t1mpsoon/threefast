@@ -41,8 +41,14 @@
     return (state || read()).dishes.reduce(function (sum, d) { return sum + d.quantity; }, 0);
   }
 
-  function total(state) {
+  function gross(state) {
     return (state || read()).dishes.reduce(function (sum, d) { return sum + d.price * d.quantity; }, 0);
+  }
+
+  function total(state) {
+    var s = state || read();
+    var g = gross(s);
+    return s.discount ? Math.round(g * (100 - s.discount)) / 100 : g;
   }
 
   function portionsLabel(n) {
@@ -100,8 +106,9 @@
     return { ok: true, quantity: next };
   }
 
-  function setMinute(iso, label) {
+  function setMinute(iso, label, discount) {
     var state = read();
+    state.discount = Number(discount) || 0;
     state.minute = iso;
     state.minuteLabel = label || null;
     write(state);
@@ -207,6 +214,8 @@
     portions: portions,
     portionsLabel: portionsLabel,
     sum: total,
+    gross: gross,
+    discount: function () { return read().discount || 0; },
     quantityOf: function (id) {
       var found = null;
       read().dishes.forEach(function (d) { if (d.id === Number(id)) found = d; });

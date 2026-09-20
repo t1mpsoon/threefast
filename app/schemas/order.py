@@ -187,6 +187,9 @@ class StatusUpdateRequest(BaseModel):
     @field_validator("new_status")
     @classmethod
     def _reject_terminal_as_target(cls, value: OrderStatus) -> OrderStatus:
+        # Допустимость перехода (в том числе «Выдан» и «Отменён») проверяет
+        # сервис по таблице ALLOWED_TRANSITIONS: здесь запрещать нельзя,
+        # иначе кухня не сможет выдать или отменить заказ.
         return value
 
 

@@ -18,6 +18,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-pytest")
 os.environ.setdefault("ENABLE_SCHEDULER", "false")
 # Тесты наполняют БД сами: автосидирование перезаписало бы тестовых пользователей.
 os.environ["SEED_ON_STARTUP"] = "false"
+os.environ["OFFPEAK_DISCOUNT_PERCENT"] = "0"
 os.environ.setdefault("LOG_LEVEL", "WARNING")
 os.environ.setdefault("RATE_LIMIT_ORDERS_PER_MINUTE", "1000")
 _TMP_DB = Path(tempfile.gettempdir()) / "express_pickup_tests.db"

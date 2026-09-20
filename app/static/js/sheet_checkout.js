@@ -32,6 +32,40 @@
 
   /* ── Отрисовка сводки ──────────────────────────────────────────────────── */
 
+  /* «Добавьте к заказу»: напитки и десерты одним касанием. Поднимает средний чек. */
+  function renderUpsell() {
+    var summary = document.getElementById('checkout-summary');
+    if (!summary || !summary.parentNode) return;
+    var old = document.getElementById('upsell');
+    if (old) old.remove();
+    if (!Cart.dishes().length) return;
+    var picks = [];
+    document.querySelectorAll('[data-section]').forEach(function (section) {
+      if (!/напит|десерт|чай|кофе|сладк|выпечк/i.test(section.dataset.section)) return;
+      section.querySelectorAll('[data-dish]').forEach(function (card) {
+        if (!Cart.quantityOf(card.dataset.dish) && picks.length < 3) picks.push(card);
+      });
+    });
+    if (!picks.length) return;
+    var box = document.createElement('div');
+    box.id = 'upsell';
+    box.className = 'upsell';
+    box.innerHTML = '<div class="upsell__title">Добавьте к заказу</div>';
+    picks.forEach(function (card) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = '+ ' + card.dataset.name + ' · ' + EP.money(Number(card.dataset.price));
+      b.addEventListener('click', function () {
+        Cart.add({ id: card.dataset.dish, name: card.dataset.name, price: card.dataset.price, cooks: card.dataset.cooks }, 1);
+      });
+      box.appendChild(b);
+    });
+    summary.parentNode.insertBefore(box, summary.nextSibling);
+  }
+  document.addEventListener('cart:changed', renderUpsell);
+  renderUpsell();
+
   var shownTotal = 0;
 
   function paint() {
@@ -53,6 +87,12 @@
     }
 
     var total = Cart.sum();
+    var note = summary.querySelector('.discount-note');
+    if (Cart.discount() && dishes.length) {
+      if (!note) { note = document.createElement('p'); note.className = 'discount-note'; summary.appendChild(note); }
+      note.textContent = 'Скидка −' + Cart.discount() + '% за выдачу вне часов пик: вы сэкономили ' +
+        EP.money(Cart.gross() - total);
+    } else if (note) { note.remove(); }
     if (total !== shownTotal) {
       EP.countUp(totalOut, shownTotal, total, function (value) { return EP.money(value); }, 320);
       if (shownTotal) EP.nudge(totalOut, 'pulse');
@@ -215,6 +255,12 @@
     busyDots();
     EP.apiFetch('/api/orders', { method: 'POST', body: JSON.stringify(body) })
       .then(function (order) {
+        try {
+          localStorage.setItem('ep_last_order', JSON.stringify({
+            place: Cart.state().place,
+            dishes: Cart.dishes()
+          }));
+        } catch (_) { /* приватный режим */ }
         Cart.empty();
         forgetKey();
         if (window.EPSound) window.EPSound.play('success');

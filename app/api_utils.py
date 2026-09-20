@@ -34,7 +34,7 @@ def client_ip(request: Request) -> str:
     if settings.trust_proxy_headers:
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            return forwarded.split(",")[-1].strip()
+            return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -75,6 +75,7 @@ def slot_to_schema(view: SlotView) -> SlotOut:
         booked_count=view.booked_count,
         is_too_soon=view.is_too_soon,
         label=view.label,
+        discount_percent=view.discount_percent,
     )
 
 

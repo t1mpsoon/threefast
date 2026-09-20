@@ -27,7 +27,25 @@
 
     {{ progress(order.status, 2, order.status_enum.tone) }}
 
+    {% if order.status in ("confirmed", "in_progress", "ready") %}
+    <div class="order-qr" id="order-qr" data-code="{{ order.order_code }}">
+      <div class="order-qr__img" id="order-qr-img" aria-hidden="true"></div>
+      <div class="order-qr__text">
+        <b>Покажите на выдаче</b>
+        <span>Кассир наведёт камеру на код, и заказ выдадут сразу. Или назовите номер {{ order.order_code }}.</span>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="stack" style="margin-top:22px">
+      {% if order.status in ("confirmed", "in_progress", "ready") %}
+      <button class="share-btn" type="button" id="calendar-button"
+              data-start="{{ order.slot.slot_datetime.strftime('%Y%m%dT%H%M%S') }}"
+              data-iso="{{ order.slot.slot_datetime.strftime('%Y-%m-%dT%H:%M:%S') }}"
+              data-place="{{ order.establishment.name if order.establishment else 'ThreeFast' }}"
+              data-address="{{ order.establishment.address if order.establishment and order.establishment.address else '' }}"
+              data-code="{{ order.order_code }}">Добавить в календарь</button>
+      {% endif %}
       <button class="share-btn" type="button" id="share-button">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M12 3 7.5 7.5M12 3l4.5 4.5"
@@ -135,6 +153,8 @@
 <script>
   window.SHARE_TEXT = {{ share_text|tojson }};
 </script>
+<script src="/static/js/qr.js?v={{ static_version }}"></script>
+<script src="/static/js/notify.js?v={{ static_version }}"></script>
 <script src="/static/js/order_status.js?v={{ static_version }}"></script>
 {% endblock %}
 

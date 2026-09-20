@@ -84,6 +84,12 @@ class OrderService:
             (menu_items[item.menu_item_id].price, item.quantity) for item in payload.items
         ]
         total_amount = self.calculate_total(positions)
+        # Скидка за «спокойное» время выдачи (вне часов пик).
+        from app.services.slot_service import discount_percent_for
+
+        percent = discount_percent_for(payload.slot_datetime)
+        if percent:
+            total_amount = (total_amount * (100 - percent) / 100).quantize(Decimal("0.01"))
         max_prep = max(menu_items[item.menu_item_id].prep_time_minutes for item in payload.items)
 
         # Шаг 3. Проверка слота (правило Б-1: успеть приготовить).

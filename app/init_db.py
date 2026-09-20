@@ -317,7 +317,7 @@ def seed(db: Session) -> list[tuple[str, str]]:
             None,
             username=settings.seed_superadmin_username,
             password=settings.seed_admin_password,
-            role=StaffRole.ADMIN,
+            role=StaffRole.STAFF,
             is_super=True,
         )
         if superadmin:
