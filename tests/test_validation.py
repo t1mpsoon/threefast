@@ -126,10 +126,16 @@ def test_authenticate_correct_credentials(db, users) -> None:
 
 
 def test_jwt_round_trip(users) -> None:
+    """В токене только личность и срок — роль и заведение читаются из базы.
+
+    Так смена роли применяется сразу, без перелогина, а данные из токена
+    не могут разойтись с базой. Раньше роль и заведение ехали в payload.
+    """
     token, expires = create_access_token(users["staff"])
     payload = decode_access_token(token)
     assert payload["sub"] == str(users["staff"].id)
-    assert payload["role"] == "staff"
+    assert payload["username"] == users["staff"].username
+    assert "role" not in payload and "establishment_id" not in payload
     assert expires > 0
 
 

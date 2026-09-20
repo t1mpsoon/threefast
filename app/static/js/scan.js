@@ -1,4 +1,15 @@
-/* Сканер QR заказов для кухни и администратора: камера -> код -> карточка заказа -> «Выдать». */
+/* Сканер QR заказов для кухни и администратора: камера -> код -> карточка заказа -> «Выдать».
+
+   Декодеров два, и это главное для совместимости:
+   1) встроенный `BarcodeDetector` — есть в Chrome/Edge на Android, macOS и ChromeOS,
+      работает быстро и ничего не грузит;
+   2) `jsQR` из /static/js/vendor — чистый JS на canvas, работает в остальных браузерах
+      (Safari, Firefox, Chrome на Windows), включая те, где камеры нет вовсе:
+      фото QR и ручной ввод номера доступны всегда.
+
+   Раньше запасной декодер тянулся с cdnjs по ссылке, которой там нет (404), поэтому
+   сканер молча работал только там, где есть BarcodeDetector.
+*/
 (function () {
   'use strict';
 
@@ -9,6 +20,7 @@
   var form = document.getElementById('scan-form');
   var input = document.getElementById('scan-input');
   var result = document.getElementById('scan-result');
+  var file = document.getElementById('scan-file');
 
   var NEXT = {
     confirmed: { to: 'in_progress', label: 'Начать готовить' },
@@ -21,8 +33,15 @@
     expired: 'Заказ не забрали вовремя, он снят с выдачи.'
   };
 
+  /* Больше кадр — мельче модуль QR, который ещё читается. 800 хватает
+     и на плотные коды, и на слабые телефоны. */
+  var MAX_SIDE = 800;
+  /* Если код не находится, пробуем инвертированный вариант: некоторые
+     показывают QR светлым по тёмному (тёмная тема). */
+  var INVERT_AFTER_MS = 1200;
+
   var stream = null, detector = null, canvas = null, running = false, paused = false, busy = false;
-  var wanted = false, jsqrTried = false;
+  var wanted = false, nativeMisses = 0, lastHit = 0, jsqrLoading = null, needsGesture = false;
 
   function esc(s) { return window.EP && EP.escapeHtml ? EP.escapeHtml(String(s)) : String(s).replace(/[&<>"]/g, ''); }
   function say(text, tone) { if (window.EP && EP.say) EP.say(text, tone || 'info'); }
@@ -40,21 +59,23 @@
     return /^[A-Z0-9]{4}$/i.test(text) ? text : null;
   }
 
-  /* ── Камера ─────────────────────────────────────────────────────────── */
+  /* ── Декодеры ───────────────────────────────────────────────────────── */
   function loadJsQR() {
-    return new Promise(function (resolve) {
-      if (window.jsQR) return resolve(true);
-      if (jsqrTried) return resolve(false);
-      jsqrTried = true;
+    if (window.jsQR) return Promise.resolve(true);
+    if (jsqrLoading) return jsqrLoading;
+    jsqrLoading = new Promise(function (resolve) {
+      /* Скрипт уже подключён шаблоном; это запасной путь на случай,
+         если тег не успел загрузиться или его вырезал прокси. */
       var s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+      s.src = '/static/js/vendor/jsQR.min.js';
       s.onload = function () { resolve(Boolean(window.jsQR)); };
       s.onerror = function () { resolve(false); };
       document.head.appendChild(s);
     });
+    return jsqrLoading;
   }
 
-  async function prepareDetector() {
+  async function prepareDecoder() {
     if (detector || window.jsQR) return true;
     if ('BarcodeDetector' in window) {
       try {
@@ -63,28 +84,53 @@
           detector = new window.BarcodeDetector({ formats: ['qr_code'] });
           return true;
         }
-      } catch (_) { /* пробуем запасной путь */ }
+      } catch (_) { /* уходим на jsQR */ }
     }
     return loadJsQR();
   }
 
+  function drawToCanvas(source, width, height) {
+    var scale = Math.min(1, MAX_SIDE / Math.max(width, height));
+    var w = Math.max(1, Math.round(width * scale));
+    var h = Math.max(1, Math.round(height * scale));
+    canvas = canvas || document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(source, 0, 0, w, h);
+    return { ctx: ctx, w: w, h: h };
+  }
+
+  function decodeCanvas(ctx, w, h, allowInvert) {
+    if (!window.jsQR) return null;
+    var image = ctx.getImageData(0, 0, w, h);
+    var code = window.jsQR(image.data, w, h, {
+      inversionAttempts: allowInvert ? 'attemptBoth' : 'dontInvert'
+    });
+    return code ? code.data : null;
+  }
+
+  function decodeImage(source, width, height, allowInvert) {
+    /* Один и тот же путь для кадра камеры и для загруженного фото. */
+    var drawn = drawToCanvas(source, width, height);
+    return decodeCanvas(drawn.ctx, drawn.w, drawn.h, allowInvert);
+  }
+
   async function readFrame() {
     if (detector) {
-      var found = await detector.detect(video);
-      return found.length ? found[0].rawValue : null;
+      try {
+        var found = await detector.detect(video);
+        if (found && found.length) { nativeMisses = 0; return found[0].rawValue; }
+        return null;
+      } catch (_) {
+        /* Браузер объявил BarcodeDetector, но вызвать его не может:
+           после третьей осечки насовсем уходим на jsQR. */
+        if (++nativeMisses >= 3) { detector = null; await loadJsQR(); }
+        return null;
+      }
     }
-    if (window.jsQR && video.videoWidth) {
-      canvas = canvas || document.createElement('canvas');
-      var w = Math.min(video.videoWidth, 640);
-      var h = Math.round(video.videoHeight * (w / video.videoWidth));
-      canvas.width = w; canvas.height = h;
-      var ctx = canvas.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(video, 0, 0, w, h);
-      var data = ctx.getImageData(0, 0, w, h);
-      var code = window.jsQR(data.data, w, h, { inversionAttempts: 'dontInvert' });
-      return code ? code.data : null;
-    }
-    return null;
+    if (!window.jsQR || !video.videoWidth) return null;
+    var allowInvert = Date.now() - lastHit > INVERT_AFTER_MS;
+    return decodeImage(video, video.videoWidth, video.videoHeight, allowInvert);
   }
 
   async function loop() {
@@ -92,16 +138,31 @@
     if (!paused && !busy && video.readyState >= 2) {
       try {
         var text = await readFrame();
-        if (text) await onScanned(text);
+        if (text) { lastHit = Date.now(); await onScanned(text); }
       } catch (_) { /* кадр не прочитался — берём следующий */ }
     }
     window.setTimeout(loop, 160);
   }
 
+  /* ── Камера ─────────────────────────────────────────────────────────── */
+  function cameraProblem(error) {
+    var name = (error && error.name) || '';
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      return 'Камера запрещена. Разрешите её в настройках сайта или загрузите фото QR.';
+    }
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+      return 'Камера не найдена. Загрузите фото QR или введите номер.';
+    }
+    if (name === 'NotReadableError') {
+      return 'Камеру занял другое приложение. Закройте его или загрузите фото QR.';
+    }
+    return 'Камера недоступна. Загрузите фото QR или введите номер.';
+  }
+
   async function startCamera() {
     wanted = true;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showNoCamera('Браузер не даёт доступ к камере. Введите номер вручную.');
+      showNoCamera('Браузер не даёт доступ к камере. Загрузите фото QR или введите номер.');
       return;
     }
     cam.hidden = false;
@@ -109,19 +170,41 @@
     say2('Включаем камеру…');
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
       });
     } catch (error) {
-      showNoCamera(error && error.name === 'NotAllowedError'
-        ? 'Камера запрещена. Разрешите её в настройках сайта или введите номер вручную.'
-        : 'Камера недоступна. Введите номер вручную.');
+      showNoCamera(cameraProblem(error));
       return;
     }
+
+    /* Непрерывная фокусировка: без неё камера телефона часто не наводится
+       на экран в упор. Браузеры, которые этого не умеют, просто не ответят. */
+    var track = stream.getVideoTracks && stream.getVideoTracks()[0];
+    if (track && track.applyConstraints) {
+      try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (_) { /* не поддерживается */ }
+    }
+
     video.srcObject = stream;
-    try { await video.play(); } catch (_) { /* автозапуск заблокирован */ }
-    var ok = await prepareDetector();
-    if (!ok) { say2('Этот браузер не читает QR. Введите номер вручную.'); return; }
+    try {
+      await video.play();
+      needsGesture = false;
+    } catch (_) {
+      /* iOS и часть встроенных браузеров не запускают поток без касания. */
+      needsGesture = true;
+    }
+
+    var ok = await prepareDecoder();
+    if (!ok) {
+      say2('Этот браузер не умеет читать QR. Загрузите фото QR или введите номер.');
+      return;
+    }
+    if (needsGesture) {
+      say2('Нажмите «Включить камеру» ещё раз, чтобы запустить картинку');
+      return;
+    }
     running = true;
+    lastHit = Date.now();
     say2('Наведите на QR-код гостя');
     loop();
   }
@@ -149,6 +232,52 @@
     if (document.hidden) stopCamera();
     else if (wanted && !stream) startCamera();
   });
+
+  /* ── Фото QR: работает там, где камеры нет вовсе ────────────────────── */
+  async function bitmapOf(fileObj) {
+    if (window.createImageBitmap) {
+      try { return await window.createImageBitmap(fileObj); } catch (_) { /* старый браузер */ }
+    }
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(fileObj);
+      var img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Файл не открылся')); };
+      img.src = url;
+    });
+  }
+
+  if (file) {
+    file.addEventListener('change', async function () {
+      var chosen = file.files && file.files[0];
+      file.value = '';
+      if (!chosen) return;
+      say2('Читаем фото…');
+      try {
+        await prepareDecoder();
+        var bitmap = await bitmapOf(chosen);
+        var width = bitmap.width || bitmap.naturalWidth;
+        var height = bitmap.height || bitmap.naturalHeight;
+        var text = null;
+        /* Нативный детектор умеет и по картинке — пробуем его первым. */
+        if (detector) {
+          try {
+            var found = await detector.detect(bitmap);
+            if (found && found.length) text = found[0].rawValue;
+          } catch (_) { /* ниже прочитает jsQR */ }
+        }
+        if (!text) text = decodeImage(bitmap, width, height, true);
+        if (bitmap.close) bitmap.close();
+        if (!text) {
+          say2('На фото не нашёлся QR-код. Снимите ближе и ровнее.');
+          return;
+        }
+        await onScanned(text);
+      } catch (_) {
+        say2('Фото не удалось прочитать. Попробуйте другое.');
+      }
+    });
+  }
 
   /* ── Поиск заказа ───────────────────────────────────────────────────── */
   async function onScanned(text) {
@@ -181,6 +310,7 @@
   function resume() {
     result.innerHTML = '';
     paused = false;
+    lastHit = Date.now();
     say2('Наведите на QR-код гостя');
     if (wanted && !stream) startCamera();
   }

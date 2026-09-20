@@ -19,7 +19,13 @@
     <span class="scan__frame" aria-hidden="true"></span>
     <div class="scan__hint" id="scan-hint" role="status"></div>
   </div>
-  <button class="btn btn--line" type="button" id="scan-toggle">Включить камеру</button>
+  <div class="scan__acts">
+    <button class="btn btn--line" type="button" id="scan-toggle">Включить камеру</button>
+    <label class="btn btn--line" for="scan-file">Загрузить фото QR</label>
+    <input class="scan__file" type="file" id="scan-file" accept="image/*"
+           aria-label="Фото QR-кода заказа">
+  </div>
+  <p class="muted small">Камера не читает? Сфотографируйте QR гостя и загрузите снимок — так работает в любом браузере, даже без камеры.</p>
 
   <form class="scan__manual" id="scan-form" novalidate>
     <label for="scan-input">Не читается? Введите номер заказа</label>
@@ -35,5 +41,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/vendor/jsQR.min.js?v={{ static_version }}"></script>
 <script src="/static/js/scan.js?v={{ static_version }}"></script>
 {% endblock %}

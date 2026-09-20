@@ -63,6 +63,85 @@ def _exposed_helpers() -> set[str]:
     return set(re.findall(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:", block.group(1), re.M))
 
 
+def _js_without_noise(source: str) -> str:
+    """Убирает комментарии и строковые литералы.
+
+    Комментарии пришлось убрать после ложного срабатывания: в шапке dialog.js
+    написано «opts: icon (эмодзи), title, text, code (крупный номер)», и линтер
+    считал `icon(` и `code(` вызовами несуществующих функций. В qr.js так же
+    «ложным вызовом» становилось слово project из комментария об исходной
+    библиотеке.
+    """
+    code = re.sub(r"/\*.*?\*/", " ", source, flags=re.S)
+    code = re.sub(r"'[^'\n]*'", "''", code)
+    code = re.sub(r'"[^"\n]*"', '""', code)
+    code = re.sub(r"`[^`]*`", "``", code, flags=re.S)
+    return re.sub(r"//[^\n]*", " ", code)
+
+
+def _js_declared_names(source: str) -> set[str]:
+    """Все имена, которые скрипт объявляет: функции, переменные и их параметры."""
+    declared = set(re.findall(r"\bfunction\s+([A-Za-z_$][A-Za-z0-9_$]*)", source))
+    declared |= set(re.findall(r"\b(?:var|let|const)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=", source))
+    # Методы прототипа: Sheet.prototype.open = function () {...}
+    declared |= set(re.findall(r"\.prototype\.([A-Za-z_$][A-Za-z0-9_$]*)\s*=", source))
+    declared |= _js_parameter_names(source)
+    return declared
+
+
+def _js_parameter_names(source: str) -> set[str]:
+    """Параметры функций, включая вложенные.
+
+    Прошлая версия искала `(...)` одной регуляркой и на `new Promise(function
+    (resolve) {` собирала токен «function (resolve» — поэтому `resolve` казался
+    необъявленным. Здесь скобки считаются с балансом.
+    """
+    names: set[str] = set()
+
+    def collect(inner: str) -> None:
+        for part in inner.split(","):
+            token = part.strip().split("=")[0].strip()
+            if re.fullmatch(r"[A-Za-z_$][A-Za-z0-9_$]*", token or ""):
+                names.add(token)
+
+    for match in re.finditer(r"\bfunction\b\s*[A-Za-z0-9_$]*\s*\(", source):
+        start = match.end() - 1
+        depth = 0
+        for index in range(start, len(source)):
+            if source[index] == "(":
+                depth += 1
+            elif source[index] == ")":
+                depth -= 1
+                if depth == 0:
+                    collect(source[start + 1:index])
+                    break
+
+    for match in re.finditer(r"\(([^()]*)\)\s*=>", source):
+        collect(match.group(1))
+    for match in re.finditer(r"(?:^|[^\w.$])([A-Za-z_$][A-Za-z0-9_$]*)\s*=>", source):
+        names.add(match.group(1))
+    return names
+
+
+_JS_BUILTINS = {
+    "if", "for", "while", "switch", "catch", "return", "typeof", "function",
+    "parseInt", "parseFloat", "isNaN", "setTimeout", "clearTimeout", "setInterval",
+    "clearInterval", "requestAnimationFrame", "encodeURIComponent",
+    "decodeURIComponent", "fetch", "alert", "confirm", "prompt", "require", "import",
+}
+
+
+def _undefined_js_helpers(source: str, shared: set[str]) -> list[str]:
+    """Вызовы функций, которых нет ни в самом скрипте, ни в общем EP."""
+    code = _js_without_noise(source)
+    declared = _js_declared_names(code)
+    called = set(re.findall(r"(?<![\w.$])([a-z][A-Za-z0-9_$]*)\s*\(", code))
+    return sorted(
+        name for name in called
+        if name not in declared and name not in shared and name not in _JS_BUILTINS
+    )
+
+
 # ── Контракт шаблонов и скриптов ────────────────────────────────────────────
 
 def test_ep_helpers_are_discovered() -> None:
@@ -81,38 +160,28 @@ def test_scripts_do_not_call_undefined_helpers(path: Path) -> None:
     без префикса `EP.` после того, как локальную копию убрали. Так меню кухни
     падало с ReferenceError, а в консоль браузера ошибка не попадала вовсе.
     """
-    source = _read(path)
     if path.name == "app.js":
         return
 
-    shared = _exposed_helpers()
-    declared = set(re.findall(r"\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)", source))
-    declared |= set(re.findall(r"\bvar\s+([A-Za-z_][A-Za-z0-9_]*)\s*=", source))
-    # Методы прототипа: Sheet.prototype.open = function () {...}
-    declared |= set(re.findall(r"\.prototype\.([A-Za-z_][A-Za-z0-9_]*)\s*=", source))
-    for group in re.findall(r"\(([^)]*)\)", source):
-        for part in group.split(","):
-            token = part.strip().split("=")[0].strip()
-            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", token or ""):
-                declared.add(token)
-
-    # Убираем строковые литералы: там встречаются CSS-функции вида
-    # 'translateX(10px)', и они не являются вызовами JavaScript.
-    code = re.sub(r"'[^'\n]*'", "''", source)
-    code = re.sub(r'"[^"\n]*"', '""', code)
-    code = re.sub(r"`[^`]*`", "``", code, flags=re.S)
-    called = set(re.findall(r"(?<![\w.$])([a-z][A-Za-z0-9_]*)\s*\(", code))
-    builtins = {
-        "if", "for", "while", "switch", "catch", "return", "typeof", "function",
-        "parseInt", "parseFloat", "isNaN", "setTimeout", "clearTimeout", "setInterval",
-        "clearInterval", "requestAnimationFrame", "encodeURIComponent",
-        "decodeURIComponent", "fetch", "alert", "confirm", "prompt", "require", "import",
-    }
-    suspicious = sorted(
-        name for name in called
-        if name not in declared and name not in shared and name not in builtins
-    )
+    suspicious = _undefined_js_helpers(_read(path), _exposed_helpers())
     assert not suspicious, f"{path.name} вызывает необъявленное: {suspicious}"
+
+
+def test_undefined_helper_check_is_not_blind() -> None:
+    """Проверка выше обязана ловить настоящие вызовы, а не только молчать.
+
+    Иначе «починка» ложных срабатываний превратила бы линтер в заглушку.
+    """
+    assert _undefined_js_helpers("function paint() { draw(); }", set()) == ["draw"]
+    assert _undefined_js_helpers("helper();", {"helper"}) == [], "EP-хелпер не должен считаться своим"
+
+    # Упоминание в комментарии или строке — не объявление и не вызов.
+    noisy = "/* подсказка: ghost() */ var s = 'ghost()'; ghost();"
+    assert _undefined_js_helpers(noisy, set()) == ["ghost"]
+
+    # Вложенные параметры и стрелочные функции объявлены.
+    assert _undefined_js_helpers("new Promise(function (resolve) { resolve(1); });", set()) == []
+    assert _undefined_js_helpers("var f = (a, b) => a(b);", set()) == []
 
 
 @pytest.mark.parametrize(
@@ -248,6 +317,9 @@ def test_shadow_only_on_photo_cards() -> None:
             # Кнопка «наверх» плавает поверх содержимого: без тени она
             # сливается с текстом, под которым проходит.
             ".to-top",
+            # Диалог и рамка сканера — такие же слои поверх содержимого:
+            # диалог лежит на затемнении, рамка гасит всё вне кадра камеры.
+            ".dlg__box", ".scan__frame",
         )
         if not any(token in selector for token in allowed):
             offenders.append(selector.strip())

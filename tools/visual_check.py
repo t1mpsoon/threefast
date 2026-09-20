@@ -11,8 +11,8 @@ import random
 import sys
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
-
+# playwright импортируется внутри main(): без него модуль остаётся читаемым
+# (константы вроде GUEST_NAMES нужны тестам, а браузер — только для снимков).
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000"
 # Имена для проверки оформления: в демо-очереди не должно быть десятка клонов.
 GUEST_NAMES = ["Айгерим", "Данияр", "Мадина", "Тимур", "Асель", "Ерасыл",
@@ -136,6 +136,8 @@ def shoot(page, name: str, url: str, tag: str, wait: int = 900) -> dict:
 
 
 def main() -> int:
+    from playwright.sync_api import sync_playwright
+
     OUT.mkdir(exist_ok=True)
     problems: list[str] = []
     report: dict[str, dict] = {}

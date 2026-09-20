@@ -29,7 +29,11 @@ def test_seed_creates_superadmin_account(db: Session) -> None:
 
     superadmin = supers[0]
     assert superadmin.username == settings.seed_superadmin_username
-    assert superadmin.role == StaffRole.ADMIN.value, "у администратора сервиса роль admin"
+    # Роль именно `staff`, а не `admin`: заведение у администратора сервиса
+    # своё отсутствует, и роль заведения открыла бы ему меню, слоты и настройки
+    # несуществующей точки. Его права держит флаг is_super, а рабочий экран — /super.
+    assert superadmin.role == StaffRole.STAFF.value
+    assert superadmin.is_admin is False, "администратор сервиса не админ конкретной точки"
     assert superadmin.can_manage_places is True
     # Администратор сервиса не относится ни к одной точке: иначе он занимал бы
     # чужое заведение и в списке выглядел администратором первого кафе.

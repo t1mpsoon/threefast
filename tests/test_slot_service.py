@@ -65,7 +65,11 @@ def test_slots_sorted_by_time(db: Session, establishment: Establishment) -> None
 
 
 def test_slots_outside_working_hours_not_generated(db: Session) -> None:
-    """Слоты вне рабочих часов не отображаются вовсе (edge case раздела 2.15)."""
+    """Слоты вне рабочих часов не отображаются вовсе (edge case раздела 2.15).
+
+    Сетка идёт от открытия до закрытия, не включая минуту закрытия: слот ровно
+    в 10:00 означал бы выдачу в момент, когда точка уже закрылась.
+    """
     establishment = Establishment(
         name="Утреннее кафе",
         opens_at=time(8, 0),
@@ -83,8 +87,9 @@ def test_slots_outside_working_hours_not_generated(db: Session) -> None:
         "08:30",
         "09:00",
         "09:30",
-        "10:00",
     ]
+    assert all(view.slot_datetime.time() < establishment.closes_at for view in views)
+    assert all(view.slot_datetime.time() >= establishment.opens_at for view in views)
 
 
 def test_slot_too_soon_excluded_by_min_prep_time(db: Session, establishment) -> None:

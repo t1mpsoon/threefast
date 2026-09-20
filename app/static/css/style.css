@@ -2244,6 +2244,8 @@ body:not(.has-tabbar) .to-top { bottom: 16px; }
 .qr-poster h2 { margin: 0; font-size: 26px; line-height: 1.15; }
 .qr-poster__steps { margin: 0; padding-left: 20px; text-align: left; font-size: 15px; line-height: 1.6; }
 .qr-poster__table { font-size: 28px; font-weight: 800; }
+.qr-poster__code { line-height: 0; }
+.qr-poster__code svg { display: block; }
 @media print {
   .top, .tabbar, .no-print, footer, .page-glow { display: none !important; }
   .qr-sheet { display: block; }
@@ -2269,16 +2271,21 @@ body:not(.has-tabbar) .to-top { bottom: 16px; }
 /* ── Диалоги ───────────────────────────────────────────────────────────── */
 .dlg {
   position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-end; justify-content: center;
-  background: rgba(20, 22, 26, 0); transition: background .18s ease; padding: 0;
+  background: rgba(20, 22, 26, 0); transition: background var(--t-in) var(--ease-in); padding: 0;
 }
 .dlg.is-in { background: var(--scrim, rgba(20, 22, 26, .5)); }
 .dlg__box {
   width: 100%; max-width: 440px; background: var(--base); color: var(--ink);
   border-radius: 24px 24px 0 0; padding: 26px 22px calc(22px + env(safe-area-inset-bottom));
-  transform: translateY(24px); opacity: 0; transition: transform .22s ease, opacity .22s ease;
+  transform: translateY(24px); opacity: 0; transition: transform var(--t-in) var(--ease-in), opacity var(--t-in) var(--ease-in);
+  /* Диалог — слой поверх затемнения, как нижняя шторка: без тени он сливается с фоном. */
   box-shadow: 0 -8px 40px rgba(0, 0, 0, .18);
 }
-.dlg.is-in .dlg__box { transform: none; opacity: 1; }
+.dlg.is-in .dlg__box {
+  transform: none; opacity: 1;
+  /* Появление медленнее закрытия — как у шторки. */
+  transition: transform var(--t-out) var(--ease-out), opacity var(--t-out) var(--ease-out);
+}
 .dlg.is-out { background: rgba(20, 22, 26, 0); }
 .dlg.is-out .dlg__box { transform: translateY(24px); opacity: 0; }
 @media (min-width: 640px) {
@@ -2344,7 +2351,7 @@ button, a, .chip { -webkit-tap-highlight-color: transparent; touch-action: manip
   display: flex; align-items: center; gap: 16px; margin: 20px 0 0; padding: 16px;
   background: var(--cloud); border-radius: var(--r-card);
 }
-.order-qr__img { flex: 0 0 auto; line-height: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px var(--hairline); }
+.order-qr__img { flex: 0 0 auto; line-height: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--hairline); }
 .order-qr__img svg { width: 132px; height: 132px; display: block; }
 .order-qr__text { display: flex; flex-direction: column; gap: 4px; }
 .order-qr__text span { font-size: 14px; opacity: .75; }
@@ -2354,9 +2361,13 @@ button, a, .chip { -webkit-tap-highlight-color: transparent; touch-action: manip
 .scan__cam { position: relative; border-radius: var(--r-card); overflow: hidden; background: #000; aspect-ratio: 1 / 1; max-height: 70vh; }
 .scan__cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .scan__frame {
-  position: absolute; inset: 18%; border: 3px solid #fff; border-radius: 22px;
+  position: absolute; inset: 18%; border: 3px solid #fff; border-radius: var(--r-card);
+  /* Не украшение, а маска: всё вне рамки гасится сплошным кольцом. */
   box-shadow: 0 0 0 999px rgba(0, 0, 0, .35); pointer-events: none;
 }
+.scan__acts { display: flex; flex-wrap: wrap; gap: 10px; }
+.scan__acts .btn { flex: 1 1 auto; justify-content: center; }
+.scan__file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .scan__hint {
   position: absolute; left: 12px; right: 12px; bottom: 12px; text-align: center; color: #fff;
   background: rgba(0, 0, 0, .55); padding: 8px 12px; border-radius: var(--r-pill); font-size: 14px; font-weight: 600;
