@@ -84,6 +84,19 @@ def test_active_order_has_no_cross(client, establishment, menu) -> None:
     assert "Отменить заказ" in html
 
 
+def test_order_page_shows_payment_in_words(client, establishment, menu) -> None:
+    """Гость видит «Наличными при получении», а не техническое `pending`.
+
+    Свойство `payment_method_title` в шаблоне уже использовалось, но у модели
+    его не было: на экране заказа светилось служебное значение из базы.
+    """
+    code = _create(client, establishment, menu, key="cancel-key-0007")
+    html = client.get(f"/order?code={code}").text
+    assert "Оплата" in html
+    assert "при получении" in html, "способ оплаты показан техническим значением"
+    assert "pending" not in html
+
+
 def test_success_screen_allows_cancel(client, establishment, menu) -> None:
     """Отменить можно и сразу после оформления: гость мог ошибиться.
 

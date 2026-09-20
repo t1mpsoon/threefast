@@ -37,7 +37,7 @@
         </div>
         <div class="summary__row small muted">
           <span>Время выдачи</span>
-          <span>{{ order.slot.slot_datetime|slot_time }} · {{ order.slot.slot_datetime|humanize_slot }}</span>
+          <span>{{ order.slot.slot_datetime|humanize_slot }}</span>
         </div>
       </div>
       {% if order.status == 'expired' %}

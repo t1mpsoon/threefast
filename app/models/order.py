@@ -213,6 +213,15 @@ class Order(Base):
         return OrderStatus(self.status)
 
     @property
+    def payment_method_title(self) -> str:
+        """Способ оплаты словами: «Картой при получении».
+
+        В шаблоне экрана заказа это свойство уже использовалось, но у модели
+        его не было — гость видел техническое `pending` вместо объяснения.
+        """
+        return PaymentMethod(self.payment_method).title
+
+    @property
     def slot_datetime(self) -> datetime:
         return self.slot.slot_datetime
 

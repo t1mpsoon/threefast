@@ -536,6 +536,10 @@ venv\Scripts\python.exe -m tools.check_table_browser http://127.0.0.1:8000
 venv\Scripts\python.exe -m tools.check_panel_browser http://127.0.0.1:8000
 venv\Scripts\python.exe -m tools.check_cancel_browser http://127.0.0.1:8000
 venv\Scripts\python.exe -m tools.visual_check http://127.0.0.1:8000
+
+# Презентация защиты: снимки приложения, колода слайдов и PDF
+venv\Scripts\python.exe -m tools.screenshots     # снимки в presentation/ (нужен запущенный сервер)
+venv\Scripts\python.exe -m tools.presentation --pdf
 ```
 
 Последним двум нужен playwright — он не входит в `requirements.txt`, чтобы не

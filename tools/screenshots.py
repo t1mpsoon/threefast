@@ -35,6 +35,24 @@ STAFF_PASSWORD = os.environ.get("EP_STAFF_PASSWORD", "demo-pass-12345")
 DESKTOP = {"width": 1440, "height": 950}
 MOBILE = {"width": 390, "height": 844}
 
+# Подсказки (nudges.js) при первом заходе открывают диалоги — установка
+# приложения, знакомство, уведомления. На кадрах они перекрывают интерфейс,
+# поэтому в контексте снимков помечаем их просмотренными заранее.
+QUIET_INIT = """
+  try {
+    localStorage.setItem('ep_tour_seen', '1');
+    localStorage.setItem('ep_notify_seen', '1');
+    localStorage.setItem('ep_install_later', String(Date.now()));
+  } catch (_) { /* приватный режим */ }
+"""
+
+
+def new_context(browser, viewport: dict, scale: int = 2):
+    """Контекст для снимка: нужный вьюпорт и без всплывающих подсказок."""
+    context = browser.new_context(viewport=viewport, device_scale_factor=scale)
+    context.add_init_script(QUIET_INIT)
+    return context
+
 # Русские имена: очередь с одинаковыми гостями выглядит как тестовые данные.
 GUESTS = [
     ("Айгерим", "+7 701 111 00 01", "Без лука, пожалуйста", "card_on_pickup"),
@@ -116,7 +134,18 @@ def prepare_demo_data() -> int:
             (48, [(menu[1].id, 2)], OrderStatus.CONFIRMED),
             (62, [(menu[2].id, 1)], OrderStatus.CONFIRMED),
             (78, [(menu[0].id, 1), (menu[1].id, 1)], OrderStatus.CONFIRMED),
+            # Отменённый заказ: показывает и «гость не придёт» в очереди,
+            # и отдельный экран отмены у гостя.
+            (95, [(menu[0].id, 1), (menu[2].id, 2)], OrderStatus.CANCELLED),
         ]
+
+        # Маршрут по статусам: отмену ставим сразу, остальное — по цепочке.
+        routes = {
+            OrderStatus.CONFIRMED: (),
+            OrderStatus.IN_PROGRESS: (OrderStatus.IN_PROGRESS,),
+            OrderStatus.READY: (OrderStatus.IN_PROGRESS, OrderStatus.READY),
+            OrderStatus.CANCELLED: (OrderStatus.CANCELLED,),
+        }
 
         created = 0
         for index, (minutes, items, target) in enumerate(plan):
@@ -131,6 +160,8 @@ def prepare_demo_data() -> int:
                     guest_name=name,
                     guest_phone=phone,
                     note=note,
+                    # Часть заказов — за столиком: смена видит, куда нести.
+                    table_number=None if index % 3 == 2 else (index % 5) + 1,
                     items=[{"menu_item_id": i, "quantity": q} for i, q in items],
                     payment_method=payment,
                     idempotency_key=f"presentation-{index:02d}",
@@ -139,15 +170,11 @@ def prepare_demo_data() -> int:
                 print(f"  заказ {index} не создан: {type(error).__name__}: {error}")
                 continue
 
-            for step in (OrderStatus.IN_PROGRESS, OrderStatus.READY):
-                if target is OrderStatus.CONFIRMED:
-                    break
+            for step in routes[target]:
                 order = service.change_status(
                     order.id, step, expected_version=order.version,
                     establishment_id=place.id,
                 )
-                if step is target:
-                    break
             created += 1
 
         # Второй точке тоже даём заказы: иначе аналитика администратора
@@ -240,6 +267,34 @@ def _fill_history(db, *, target: int = 46) -> int:
     return made
 
 
+def demo_order_codes() -> dict[str, str]:
+    """Коды демо-заказов для кадров: в работе, готовый и отменённый.
+
+    Нужны, чтобы открыть экран гостя и карточку сканера на живых данных,
+    а не на выдуманном номере.
+    """
+    from sqlalchemy import select
+
+    from app.database import SessionLocal
+    from app.models.order import Order, OrderStatus
+
+    db = SessionLocal()
+    try:
+        found: dict[str, str] = {}
+        for key, status in (
+            ("active", OrderStatus.IN_PROGRESS),
+            ("ready", OrderStatus.READY),
+            ("cancelled", OrderStatus.CANCELLED),
+        ):
+            order = db.scalars(
+                select(Order).where(Order.status == status.value).order_by(Order.id)
+            ).first()
+            found[key] = order.order_code if order else ""
+        return found
+    finally:
+        db.close()
+
+
 def save(page, path: Path, *, full: bool = False, attempts: int = 4) -> None:
     """Снимок с повтором: файл может быть занят синхронизацией каталога.
 
@@ -301,7 +356,7 @@ def main() -> int:
         browser = p.chromium.launch()
 
         # ── Путь гостя: светлая тема ───────────────────────────────────────
-        context = browser.new_context(viewport=DESKTOP, device_scale_factor=2)
+        context = new_context(browser, DESKTOP)
         page = context.new_page()
         page.goto(f"{BASE}/", wait_until="networkidle")
         settle(page, 2000)
@@ -380,7 +435,7 @@ def main() -> int:
         context.close()
 
         # ── Панели: светлая тема ───────────────────────────────────────────
-        context = browser.new_context(viewport=DESKTOP, device_scale_factor=2)
+        context = new_context(browser, DESKTOP)
         page = context.new_page()
         login(page, "kitchen-bowl", STAFF_PASSWORD, "/staff")
         shot(page, "10-kitchen-queue", "Кухня: очередь смены",
@@ -394,9 +449,9 @@ def main() -> int:
              full=True)
         context.close()
 
-        context = browser.new_context(viewport=DESKTOP, device_scale_factor=2)
+        context = new_context(browser, DESKTOP)
         page = context.new_page()
-        login(page, "demo_admin", ADMIN_PASSWORD, "/staff")
+        login(page, "admin", ADMIN_PASSWORD, "/staff")
         page.click('.crew__tab[data-panel="settings"]')
         settle(page, 1600)
         shot(page, "12-admin-settings", "Администратор заведения: настройки",
@@ -411,7 +466,7 @@ def main() -> int:
         context.close()
 
         # ── Администратор сервиса ──────────────────────────────────────────
-        context = browser.new_context(viewport=DESKTOP, device_scale_factor=2)
+        context = new_context(browser, DESKTOP)
         page = context.new_page()
         login(page, "superadmin", ADMIN_PASSWORD, "/super")
         page.wait_for_timeout(1500)
@@ -425,8 +480,58 @@ def main() -> int:
                       "note": "Пароль показывается один раз: в базе хранится только хеш"})
         context.close()
 
+        # ── Выдача, слежение и отмена: кадры новых экранов ─────────────────
+        codes = demo_order_codes()
+
+        context = new_context(browser, DESKTOP)
+        page = context.new_page()
+        login(page, "kitchen-bowl", STAFF_PASSWORD, "/staff")
+        page.goto(f"{BASE}/scan", wait_until="networkidle")
+        settle(page, 1600)
+        shot(page, "22-scan-page", "Выдача: сканер заказов",
+             "Камера, ручной ввод номера и загрузка фото QR: работает и там, "
+             "где камеры нет вовсе")
+
+        if codes["ready"]:
+            page.fill("#scan-input", codes["ready"])
+            page.click('#scan-form button[type="submit"]')
+            page.wait_for_selector(".scan-card", timeout=15000)
+            # Плашка «камера недоступна» в этом окружении честная, но на кадре
+            # читается как ошибка: ждём, пока она растает.
+            settle(page, 6000)
+            shot(page, "23-scan-card", "Выдача: заказ открыт по QR",
+                 f"Карточка заказа {codes['ready']}: состав, столик и действие "
+                 "«Выдать заказ» — одно нажатие вместо поиска в списке")
+        context.close()
+
+        context = new_context(browser, MOBILE, 3)
+        page = context.new_page()
+        if codes["active"]:
+            page.goto(f"{BASE}/order?code={codes['active']}", wait_until="networkidle")
+            settle(page, 1600)
+            shot(page, "24-order-live", "Гость: заказ готовится",
+                 "Живой трекинг: статус, шкала «Принят → Готовится → Готово → Выдано» "
+                 "и время выдачи. Статус приходит с кухни сам, без перезагрузки")
+
+        if codes["cancelled"]:
+            page.goto(f"{BASE}/order?code={codes['cancelled']}", wait_until="networkidle")
+            settle(page, 1600)
+            shot(page, "25-order-cancelled", "Гость: заказ отменён",
+                 "Отдельный экран с крестиком, составом заказа и кнопкой "
+                 "«Заказать заново» — вместо карточки с погасшей шкалой")
+        context.close()
+
+        context = new_context(browser, DESKTOP)
+        page = context.new_page()
+        page.goto(f"{BASE}/e/2/qr?table=5", wait_until="networkidle")
+        settle(page, 1600)
+        shot(page, "26-qr-poster", "QR-плакат: заведение и столик",
+             "Плакат печатается для любой точки и любого столика; метка стола "
+             "подставит гостю номер при оформлении")
+        context.close()
+
         # ── Тёмная тема ────────────────────────────────────────────────────
-        context = browser.new_context(viewport=DESKTOP, device_scale_factor=2)
+        context = new_context(browser, DESKTOP)
         page = context.new_page()
         page.goto(f"{BASE}/", wait_until="networkidle")
         page.evaluate("() => document.documentElement.setAttribute('data-theme', 'dark')")
@@ -436,7 +541,7 @@ def main() -> int:
              full=True)
         context.close()
 
-        context = browser.new_context(viewport=DESKTOP, device_scale_factor=2)
+        context = new_context(browser, DESKTOP)
         page = context.new_page()
         page.goto(f"{BASE}/e/2/menu", wait_until="networkidle")
         page.evaluate("() => document.documentElement.setAttribute('data-theme', 'dark')")
@@ -446,7 +551,7 @@ def main() -> int:
         context.close()
 
         # ── Телефон ────────────────────────────────────────────────────────
-        context = browser.new_context(viewport=MOBILE, device_scale_factor=3)
+        context = new_context(browser, MOBILE, 3)
         page = context.new_page()
         page.goto(f"{BASE}/", wait_until="networkidle")
         settle(page, 1900)
@@ -468,9 +573,19 @@ def main() -> int:
         save(page, OUT / "20-mobile-sheet.png")
         shots.append({"file": "20-mobile-sheet.png", "title": "Телефон: выбор времени",
                       "note": "Шторка поверх меню: корзина остаётся на месте"})
+
+        # Шаг 3: выбираем свободную минуту и открываем оформление — на телефоне
+        # его раньше не снимали, а на слайдах нужен ровный ряд из трёх шагов.
+        page.click(".slot:not([disabled])")
+        page.wait_for_timeout(800)
+        page.click("#time-confirm")
+        page.wait_for_timeout(1600)
+        save(page, OUT / "20b-mobile-checkout.png")
+        shots.append({"file": "20b-mobile-checkout.png", "title": "Телефон: оформление заказа",
+                      "note": "Имя, телефон и столик: регистрации и пароля нет"})
         context.close()
 
-        context = browser.new_context(viewport=MOBILE, device_scale_factor=3)
+        context = new_context(browser, MOBILE, 3)
         page = context.new_page()
         login(page, "kitchen-bowl", STAFF_PASSWORD, "/staff")
         save(page, OUT / "21-mobile-kitchen.png")

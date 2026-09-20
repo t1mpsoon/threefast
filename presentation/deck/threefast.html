@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ThreeFast — защита проекта</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+/* ═══ Колода собрана на токенах самого приложения: тот же акцент, та же
+   типографика, те же два радиуса. Слайд — 1280×720, печатается как 16:9. ═══ */
+:root{
+  --base:#FFFFFF; --cloud:#F4F5F7; --ink:#1B1D21; --muted:#646B78;
+  --flame:#FF4F32; --flame-dark:#C6331A; --flame-soft:#FFF0ED;
+  --fresh:#12B76A; --fresh-deep:#0E9B5A; --fresh-soft:#E7F8F0;
+  --amber-soft:#FEF4E6; --amber-deep:#C97A08;
+  --hairline:#E7E9ED;
+  --r-card:20px; --r-inner:14px; --r-pill:999px;
+  --font:"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --shadow:0 12px 34px rgba(27,29,33,.12);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0E1014;font-family:var(--font);color:var(--ink)}
+.stage{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+.deck{width:1280px;height:720px;position:relative;background:var(--base);
+      transform-origin:center center;overflow:hidden}
+.slide{display:none;position:absolute;inset:0;padding:58px 68px;background:var(--base)}
+.slide.is-active{display:block}
+.slide::after{ /* номер слайда */
+  content:attr(data-n);position:absolute;right:30px;bottom:22px;
+  font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.08em;
+}
+.glow{position:absolute;inset:-40% 30% 55% -20%;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(255,79,50,.14),transparent 72%)}
+
+/* ── Типографика слайдов ───────────────────────────────────────────────── */
+.kicker{font-size:14px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--flame);margin:0 0 14px}
+h1{font-size:62px;font-weight:800;letter-spacing:-.038em;line-height:1.04;margin:0}
+h2{font-size:42px;font-weight:800;letter-spacing:-.032em;line-height:1.08;margin:0 0 10px}
+h3{font-size:21px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+p{margin:0;font-size:18px;line-height:1.5;color:var(--muted)}
+.lead{font-size:21px;line-height:1.45}
+.small{font-size:15px}
+.tiny{font-size:13px;color:var(--muted)}
+b,strong{font-weight:800;color:var(--ink)}
+.num{font-variant-numeric:tabular-nums}
+ul{margin:0;padding:0;list-style:none}
+li{position:relative;padding-left:26px;margin:11px 0;font-size:17px;line-height:1.45;color:var(--muted)}
+li::before{content:"";position:absolute;left:4px;top:9px;width:8px;height:8px;
+  border-radius:50%;background:var(--flame)}
+li.ok::before{background:var(--fresh-deep)}
+
+/* ── Компоненты ────────────────────────────────────────────────────────── */
+.card{background:var(--cloud);border-radius:var(--r-card);padding:26px 28px}
+.card--line{background:var(--base);border:1px solid var(--hairline)}
+.chip{display:inline-flex;align-items:center;gap:7px;border-radius:var(--r-pill);
+  padding:8px 16px;font-size:14px;font-weight:700;background:var(--cloud);color:var(--ink)}
+.chip--flame{background:var(--flame-soft);color:var(--flame-dark)}
+.chip--fresh{background:var(--fresh-soft);color:#0B7A47}
+.chip--amber{background:var(--amber-soft);color:#8A5207}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.grid{display:grid;gap:22px}
+.frame{border:1px solid var(--hairline);border-radius:var(--r-inner);
+  overflow:hidden;background:var(--base);box-shadow:var(--shadow)}
+.frame img{display:block;width:100%;height:auto}
+.frame--phone{border-radius:26px;width:auto}
+.frame--phone img{height:100%;width:auto}
+.cap{font-size:14px;font-weight:700;color:var(--ink);margin-top:10px}
+.cap span{display:block;font-weight:500;color:var(--muted);margin-top:3px}
+.big{font-size:52px;font-weight:800;letter-spacing:-.04em;line-height:1.05;
+  color:var(--flame);white-space:nowrap}
+.big--ink{color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:16px}
+th,td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--hairline);
+  vertical-align:top;color:var(--muted)}
+th{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
+td:first-child,th:first-child{padding-left:0}
+tr:last-child td{border-bottom:0}
+td.us{color:var(--ink);font-weight:700;background:var(--flame-soft)}
+th.us{color:var(--flame-dark);background:var(--flame-soft)}
+.brand{display:flex;align-items:center;gap:12px;font-size:24px;font-weight:800;letter-spacing:-.03em}
+.brand svg{width:44px;height:44px}
+
+/* ── Служебная панель ──────────────────────────────────────────────────── */
+.hud{position:fixed;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.12)}
+.hud i{display:block;height:100%;width:0;background:var(--flame);transition:width .25s ease}
+.hint{position:fixed;right:14px;bottom:14px;font-size:12px;color:rgba(255,255,255,.45)}
+
+/* ── Печать: слайд = страница 16:9 ─────────────────────────────────────── */
+@page{size:13.333in 7.5in;margin:0}
+@media print{
+  html,body{background:#fff}
+  .stage{position:static;display:block;overflow:visible}
+  .deck{width:1280px;height:auto;transform:none!important;overflow:visible}
+  .slide{display:block!important;position:relative;width:1280px;height:720px;
+    break-after:page;page-break-after:always}
+  .slide:last-child{break-after:auto;page-break-after:auto}
+  .hud,.hint{display:none}
+  .frame{box-shadow:none}
+}
+</style>
+</head>
+<body>
+<div class="stage"><div class="deck" id="deck">
+
+<!-- 1 ─────────────────────────────────────────────── Титул -->
+<section class="slide is-active" data-n="1">
+  <div class="glow"></div>
+  <div style="height:100%;display:flex;flex-direction:column;justify-content:center;max-width:900px">
+    <div class="brand" style="margin-bottom:34px">
+      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <path d="M22 21c-3.6 3.3-5.6 7.4-5.9 11.9" stroke="#FF4F32" stroke-width="3.6" stroke-linecap="round"/>
+        <path d="M32 8c2.6 0 4.7 2 4.9 4.5 8.6 2.4 14.6 10.2 15 19.4H12.1c.4-9.2 6.4-17 15-19.4C27.3 10 29.4 8 32 8Z" fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+        <circle cx="32" cy="7" r="3.4" fill="none" stroke="#1B1D21" stroke-width="3"/>
+        <path d="M7.5 35.5h49c0 2.4-2 4.3-4.4 4.3h-2.6c-.6 3.2-3.4 5.5-6.7 5.5H21.2c-3.3 0-6.1-2.3-6.7-5.5h-2.6c-2.4 0-4.4-1.9-4.4-4.3Z" fill="#fff" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+        <path d="M14.5 45.3h35c-1 2.7-3.5 4.5-6.4 4.5H20.9c-2.9 0-5.4-1.8-6.4-4.5Z" fill="#FF4F32" stroke="#1B1D21" stroke-width="3.4" stroke-linejoin="round"/>
+        <path d="M4 20h17" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+        <path d="M1.5 29.5h22" stroke="#1B1D21" stroke-width="5" stroke-linecap="round"/>
+        <path d="M4 39h15" stroke="#FF4F32" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+      <span>Three<span style="color:var(--flame)">Fast</span></span>
+    </div>
+    <h1>Еда готова ровно<br>к вашей минуте</h1>
+    <p class="lead" style="margin-top:26px;max-width:640px">
+      Сервис предзаказа: гость выбирает блюда и точное время получения,
+      кухня готовит к этому времени, а не к моменту, когда гость встал в очередь.
+    </p>
+    <div class="row" style="margin-top:38px">
+      <span class="chip chip--flame">Работающий MVP в облаке</span>
+      <span class="chip">3 заведения в демо</span>
+      <span class="chip">364 автотеста</span>
+    </div>
+  </div>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────── Проблема -->
+<section class="slide" data-n="2">
+  <p class="kicker">Проблема</p>
+  <h2>Обед длится час, а еда съедает половину</h2>
+  <p class="lead" style="max-width:820px">Гость тратит время дважды, кухня работает вслепую.
+     В час пик пропускная способность упирается в очередь, а не в плиту.</p>
+
+  <div class="card" style="margin-top:30px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <span class="chip">Пришёл в кафе</span><span style="color:var(--muted)">→</span>
+    <span class="chip chip--amber">Очередь на кассу · 8 мин</span><span style="color:var(--muted)">→</span>
+    <span class="chip chip--amber">Ожидание на кухне · 12 мин</span><span style="color:var(--muted)">→</span>
+    <span class="chip chip--fresh">Забрал</span>
+    <span style="margin-left:auto" class="big num">20 мин</span>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:30px">
+    <div class="card card--line">
+      <h3>У гостя</h3>
+      <p>Обеденный перерыв один, и он короткий. Половина уходит на очередь и ожидание,
+         а не на еду и отдых.</p>
+    </div>
+    <div class="card card--line">
+      <h3>У заведения</h3>
+      <p>Кухня не знает заранее, сколько людей придёт и когда. Остаётся готовить впрок
+         и терять в качестве — либо держать гостя в ожидании.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────── Решение -->
+<section class="slide" data-n="3">
+  <p class="kicker">Решение</p>
+  <div class="grid" style="grid-template-columns:1.05fr .95fr;align-items:center;height:520px">
+    <div>
+      <h2>Заказ к минуте,<br>а не «когда-нибудь»</h2>
+      <ul style="margin-top:22px">
+        <li class="ok">Гость открывает сайт заведения <b>по QR со стола</b> — приложение не нужно</li>
+        <li class="ok">Выбирает блюда и <b>точную минуту получения</b></li>
+        <li class="ok">Система знает вместимость кухни на каждую минуту
+            и продаёт <b>только выполнимые слоты</b></li>
+        <li class="ok">Гость приходит — заказ уже готов и ждёт на полке</li>
+      </ul>
+    </div>
+    <div class="frame"><img src="img/home.jpg" alt="Главный экран сервиса"></div>
+  </div>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────── Аудитория -->
+<section class="slide" data-n="4">
+  <p class="kicker">Целевая аудитория</p>
+  <h2>Пользу получают обе стороны</h2>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:26px">
+    <div class="card">
+      <span class="chip chip--flame">Гость</span>
+      <h3 style="margin-top:16px">Тот, у кого перерыв ровно час</h3>
+      <ul>
+        <li>офисные сотрудники бизнес-центров и деловых районов</li>
+        <li>те, кто заказывает навынос и ест у себя</li>
+        <li>не ставит приложение ради одного заказа</li>
+        <li>ценит предсказуемость: пришёл — забрал</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="chip chip--fresh">Заведение</span>
+      <h3 style="margin-top:16px">Точка с самовывозом и очередью в пик</h3>
+      <ul>
+        <li>кофейни, кафе, фудкорты, кулинария</li>
+        <li>в пик очередь, но расширять зал и кухню невыгодно</li>
+        <li>нужен предсказуемый поток, а не аврал</li>
+        <li>нет своей кассы с онлайн-заказом и не хочется внедрять</li>
+      </ul>
+    </div>
+  </div>
+  <p class="small" style="margin-top:22px">В демо — три разные точки: домашняя кухня, здоровая еда и кофейня.
+     Каждая со своим меню, часами и вместимостью кухни.</p>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────── Продукт: гость -->
+<section class="slide" data-n="5">
+  <p class="kicker">Продукт · путь гостя</p>
+  <h2>Три шага, без регистрации</h2>
+  <div class="row" style="margin-top:26px;gap:34px;align-items:flex-start;justify-content:center">
+    <div style="flex:0 0 auto">
+      <div class="frame frame--phone"><img src="img/menuphone.jpg" alt="Меню заведения" style="height:404px"></div>
+      <p class="cap">1. Меню<span>Фото, цена и время приготовления</span></p>
+    </div>
+    <div style="flex:0 0 auto">
+      <div class="frame frame--phone"><img src="img/timephone.jpg" alt="Выбор времени получения" style="height:404px"></div>
+      <p class="cap">2. Минута<span>Только выполнимые слоты: занятые недоступны</span></p>
+    </div>
+    <div style="flex:0 0 auto">
+      <div class="frame frame--phone"><img src="img/checkoutphone.jpg" alt="Оформление заказа" style="height:404px"></div>
+      <p class="cap">3. Оформление<span>Имя, телефон, столик — и всё</span></p>
+    </div>
+  </div>
+  <div class="row" style="margin-top:26px;justify-content:center">
+    <span class="chip chip--flame">Без регистрации и пароля</span>
+    <span class="chip chip--flame">Корзина живёт в браузере</span>
+    <span class="chip chip--flame">Сайт ставится на телефон как приложение</span>
+  </div>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────── Продукт: кухня -->
+<section class="slide" data-n="6">
+  <p class="kicker">Продукт · панель кухни</p>
+  <h2>Смена видит очередь, а не список</h2>
+  <div class="grid" style="grid-template-columns:1.55fr 1fr;gap:26px;margin-top:22px;align-items:start">
+    <div class="frame" style="max-height:520px;overflow:hidden"><img src="img/kitchen.jpg" alt="Очередь заказов на кухне"></div>
+    <div>
+      <ul>
+        <li class="ok"><b>Очередь по минутам</b> с отсчётом до выдачи — видно, что готовить первым</li>
+        <li class="ok"><b>Столик</b> прямо в талоне: заказ несут гостю, а не выкликивают номер</li>
+        <li class="ok"><b>Новый заказ со звуком</b> — смена стоит у плиты, а не смотрит в экран</li>
+        <li class="ok">Статус меняется одним нажатием: принят → готовится → готов → выдан</li>
+        <li class="ok">Смена видит <b>только своё заведение</b>: чужое меню не поправить</li>
+      </ul>
+      <div class="card" style="margin-top:18px">
+        <p class="small">Каждый талон окрашен тем же тоном, что и экран гостя:
+           акцент — принят, янтарь — в работе, зелёный — готов. Тон задаётся одним
+           свойством модели, поэтому новый статус не требует правок в вёрстке.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────── Продукт: выдача -->
+<section class="slide" data-n="7">
+  <p class="kicker">Продукт · выдача</p>
+  <h2>Навёл камеру — заказ открылся</h2>
+  <p class="lead" style="max-width:900px;margin-top:8px">Гость показывает QR-код заказа со телефона,
+     кассир наводит камеру: состав, столик и сумма уже на экране.</p>
+  <div class="row" style="margin-top:26px;gap:20px;align-items:flex-start">
+    <div style="flex:1 1 0">
+      <div class="frame"><img src="img/scan.jpg" alt="Сканер заказов"></div>
+      <p class="cap">Сканер<span>Камера, фото QR или номер вручную</span></p>
+    </div>
+    <div style="flex:1 1 0">
+      <div class="frame"><img src="img/scancard.jpg" alt="Карточка заказа в сканере"></div>
+      <p class="cap">Карточка заказа<span>Столик, состав и кнопка «Выдать заказ»</span></p>
+    </div>
+  </div>
+  <p class="small" style="margin-top:18px">Читает коды и в Chrome, и в Safari; если камера недоступна —
+     распознаёт фотографию или принимает номер руками. Выдача — одно нажатие вместо поиска в списке.</p>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────── Продукт: слежение -->
+<section class="slide" data-n="8">
+  <p class="kicker">Продукт · гость следит за заказом</p>
+  <h2>Статус приходит с кухни сам</h2>
+  <div class="row" style="margin-top:26px;gap:26px;align-items:flex-start;height:470px">
+    <div style="flex:0 0 auto">
+      <div class="frame frame--phone"><img src="img/success.jpg" alt="Заказ принят" style="height:400px"></div>
+      <p class="cap">Принят<span>Галочка и номер заказа</span></p>
+    </div>
+    <div style="flex:0 0 auto">
+      <div class="frame frame--phone"><img src="img/live.jpg" alt="Заказ готовится" style="height:400px"></div>
+      <p class="cap">Готовится<span>Шкала двигается без перезагрузки</span></p>
+    </div>
+    <div style="flex:0 0 auto">
+      <div class="frame frame--phone"><img src="img/cancelled.jpg" alt="Заказ отменён" style="height:400px"></div>
+      <p class="cap">Отменён<span>Крестик, состав и «Заказать заново»</span></p>
+    </div>
+    <div style="flex:1 1 0;padding-top:8px">
+      <ul>
+        <li class="ok">Страница обновляется <b>каждые 5 секунд</b>, пока заказ в работе</li>
+        <li class="ok">Опрос прекращается на выдаче и в скрытой вкладке — сервер не дёргаем зря</li>
+        <li class="ok">Отмена и у гостя, и у кухни показывает <b>один и тот же экран</b></li>
+        <li class="ok">Ссылка на заказ работает без входа: гость может переслать её</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────── Продукт: админ -->
+<section class="slide" data-n="9">
+  <p class="kicker">Продукт · роли и управление</p>
+  <h2>Три роли — от смены до сети заведений</h2>
+  <div class="row" style="margin-top:24px;gap:18px;align-items:flex-start">
+    <div style="flex:1.15 1 0">
+      <div class="frame"><img src="img/analytics.jpg" alt="Аналитика заведения"></div>
+      <p class="cap">Администратор точки<span>Меню, часы, вместимость кухни и два критерия кейса</span></p>
+    </div>
+    <div style="flex:1 1 0">
+      <div class="frame"><img src="img/platform.jpg" alt="Заведения сервиса"></div>
+      <p class="cap">Администратор сервиса<span>Заводит точки и выдаёт им доступ</span></p>
+    </div>
+    <div style="flex:.85 1 0">
+      <div class="frame"><img src="img/poster.jpg" alt="QR-плакат"></div>
+      <p class="cap">QR-плакат<span>Любое заведение, любой столик</span></p>
+    </div>
+  </div>
+  <p class="small" style="margin-top:16px">Печать плаката — часть продукта: метка стола в ссылке
+     подставляет гостю номер столика при оформлении, и кухня сразу знает, куда нести заказ.</p>
+</section>
+
+<!-- 10 ────────────────────────────────────────────── Конкуренты -->
+<section class="slide" data-n="10">
+  <p class="kicker">Конкуренты и преимущества</p>
+  <h2>Мы решаем не доставку, а самовывоз к минуте</h2>
+  <table style="margin-top:22px">
+    <thead>
+      <tr><th></th><th>Агрегаторы доставки</th><th>Кассовые системы</th><th class="us">ThreeFast</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Задача</td><td>привезти курьером</td><td>учёт, касса, склад</td><td class="us">забрать самому к минуте</td></tr>
+      <tr><td>Деньги с заведения</td><td>комиссия с каждого заказа</td><td>внедрение и оплата за рабочее место</td><td class="us">подписка, комиссии нет</td></tr>
+      <tr><td>Запуск</td><td>подключение к платформе</td><td>интеграция с кассой</td><td class="us">полчаса, без кассы</td></tr>
+      <tr><td>Гостю</td><td>нужно приложение</td><td>нужно приложение</td><td class="us">сайт по QR, без установки</td></tr>
+      <tr><td>Время получения</td><td>как получится</td><td>не управляет</td><td class="us">выбирает гость, минута в минуту</td></tr>
+    </tbody>
+  </table>
+  <div class="row" style="margin-top:24px">
+    <span class="chip chip--flame">Вместимость кухни на каждую минуту</span>
+    <span class="chip chip--flame">Скидка вне часов пик</span>
+    <span class="chip chip--flame">Выдача по QR за одно нажатие</span>
+    <span class="chip chip--flame">Работает без интеграций</span>
+  </div>
+  <p class="small" style="margin-top:16px">Третья альтернатива — звонки и бумажная очередь.
+     Конкурента тут нет, есть привычка, которую мы и меняем.</p>
+</section>
+
+<!-- 11 ────────────────────────────────────────────── Экономика: расходы -->
+<section class="slide" data-n="11">
+  <p class="kicker">Экономика · расходы</p>
+  <h2>Сколько стоит сделать и запустить</h2>
+  <div class="grid" style="grid-template-columns:1.25fr 1fr;gap:30px;margin-top:22px;align-items:start">
+    <table>
+      <tbody>
+        <tr><td>Разработка MVP</td><td class="us">≈ 500 часов · 17 000 строк кода и 8 000 строк тестов</td></tr>
+        <tr><td>Живые деньги на разработку</td><td class="us">0 — работа команды</td></tr>
+        <tr><td>Инфраструктура на старте</td><td class="us">0 — бесплатный тариф облака</td></tr>
+        <tr><td>Боевой режим</td><td class="us">$15–20 в месяц: сервер и база, плюс домен</td></tr>
+        <tr><td>Подключение заведения</td><td class="us">≈ 30 минут: меню, часы, вместимость, печать QR</td></tr>
+        <tr><td>Интеграция с кассой</td><td class="us">не требуется</td></tr>
+      </tbody>
+    </table>
+    <div>
+      <div class="card">
+        <h3>Почему так дешево</h3>
+        <p class="small" style="margin-top:8px">Проект не зависит от внешних платных сервисов:
+           QR рисуется в браузере, сканер работает на своём коде, статика отдаётся самим приложением.
+           Нет ни подписки на генератор кодов, ни CDN, ни платёжного шлюза.</p>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>Себестоимость одной точки падает</h3>
+        <p class="small" style="margin-top:8px">Сервер один на всех заведений: при сети
+           из 30 точек инфраструктура — меньше 1 000 ₸ на точку в месяц.</p>
+      </div>
+      <p class="tiny" style="margin-top:14px">Оценка по факту разработки и текущим тарифам хостинга.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 12 ────────────────────────────────────────────── Экономика: доход -->
+<section class="slide" data-n="12">
+  <p class="kicker">Экономика · модель дохода</p>
+  <h2>Подписка за точку вместо процента с заказов</h2>
+  <div class="grid" style="grid-template-columns:repeat(4,1fr);gap:18px;margin-top:26px">
+    <div class="card">
+      <div class="big num">20 000 ₸</div>
+      <p class="small" style="margin-top:8px">подписка заведения в месяц, комиссии нет</p>
+    </div>
+    <div class="card">
+      <div class="big big--ink num">2 500 ₸</div>
+      <p class="small" style="margin-top:8px">средний чек в демо-меню</p>
+    </div>
+    <div class="card">
+      <div class="big big--ink num">&lt; 1</div>
+      <p class="small" style="margin-top:8px">заказа в день стоит подписка</p>
+    </div>
+    <div class="card">
+      <div class="big num">&lt; 1 000 ₸</div>
+      <p class="small" style="margin-top:8px">себестоимость точки при сети в 30 заведений</p>
+    </div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;gap:22px;margin-top:26px">
+    <div class="card card--line">
+      <h3>Точке достаточно одного заказа в день</h3>
+      <p style="margin-top:8px">Столько стоит подписка. Всё, что сервис приносит сверх этого —
+         маржа заведения: возвращённые гости, ровная загрузка кухни, разгруженная касса.</p>
+    </div>
+    <div class="card card--line">
+      <h3>Дальше — рядом с подпиской</h3>
+      <ul style="margin-top:6px">
+        <li>процент с онлайн-оплаты, когда подключим эквайринг</li>
+        <li>тарифы для сетей: несколько точек одним договором</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 13 ────────────────────────────────────────────── Масштабируемость -->
+<section class="slide" data-n="13">
+  <p class="kicker">Масштабируемость</p>
+  <h2>От одной точки до международного рынка</h2>
+  <div class="row" style="margin-top:26px;gap:12px">
+    <span class="chip chip--flame">Алматы и Астана</span><span style="color:var(--muted)">→</span>
+    <span class="chip">Города Казахстана</span><span style="color:var(--muted)">→</span>
+    <span class="chip">СНГ: похожий формат самовывоза</span><span style="color:var(--muted)">→</span>
+    <span class="chip">Любой рынок с обеденным перерывом</span>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;gap:24px;margin-top:28px">
+    <div class="card">
+      <h3>Что уже готово к росту</h3>
+      <ul style="margin-top:8px">
+        <li class="ok">Заведения изолированы: своё меню, слоты, вместимость, аккаунты</li>
+        <li class="ok">Новая точка — операция в интерфейсе администратора, без правок кода</li>
+        <li class="ok">PostgreSQL, миграции и догон схемы при старте</li>
+        <li class="ok">Нет внешних зависимостей: ни CDN, ни платных API</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Что нужно добавить для выхода за пределы страны</h3>
+      <ul style="margin-top:8px">
+        <li>локализация интерфейса: сейчас только русский язык</li>
+        <li>мультивалютность и локальные платёжные провайдеры</li>
+        <li>фоновые задачи в отдельный воркер, когда точек станет много</li>
+        <li>партнёрская сеть подключения заведений на местах</li>
+      </ul>
+    </div>
+  </div>
+  <p class="small" style="margin-top:22px">Страна и часовой пояс — параметр конфигурации, а не правка кода:
+     сервис уже развёрнут с часовым поясом Алматы.</p>
+</section>
+
+<!-- 14 ────────────────────────────────────────────── Финал -->
+<section class="slide" data-n="14">
+  <div class="glow"></div>
+  <div style="height:100%;display:flex;align-items:center;gap:56px">
+    <div style="flex:1 1 0">
+      <h1 style="font-size:52px">Не заставлять человека<br>ждать еду</h1>
+      <p class="lead" style="margin-top:20px">А подготовить её к моменту, когда он придёт.</p>
+      <div class="row" style="margin-top:34px">
+        <span class="chip chip--flame">ThreeFast</span>
+        <span class="chip">threefast.onrender.com</span>
+      </div>
+      <p class="small" style="margin-top:30px">Спасибо за внимание. Готовы ответить на вопросы.</p>
+    </div>
+    <div style="flex:0 0 auto;text-align:center">
+      <div class="frame" style="padding:14px;border-radius:var(--r-card)">
+        <img src="qr.svg" alt="QR-код со ссылкой на ThreeFast" style="width:220px;height:220px;display:block">
+      </div>
+      <p class="tiny" style="margin-top:10px">Наведите камеру — откроется живой сервис</p>
+    </div>
+  </div>
+</section>
+
+</div></div>
+
+<div class="hud"><i id="hud-bar"></i></div>
+<div class="hint">← → перелистывание · F — во весь экран · Ctrl+P — PDF</div>
+
+<script>
+(function () {
+  'use strict';
+  var deck = document.getElementById('deck');
+  var slides = Array.prototype.slice.call(deck.querySelectorAll('.slide'));
+  var bar = document.getElementById('hud-bar');
+  var index = 0;
+
+  /* Слайд нарисован в 1280×720 и масштабируется целиком: так вёрстка
+     не зависит от размера экрана и совпадает с PDF. */
+  function fit() {
+    var k = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    deck.style.transform = 'scale(' + k + ')';
+  }
+
+  function show(next) {
+    index = Math.max(0, Math.min(slides.length - 1, next));
+    slides.forEach(function (slide, i) { slide.classList.toggle('is-active', i === index); });
+    bar.style.width = ((index + 1) / slides.length * 100) + '%';
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+      event.preventDefault(); show(index + 1);
+    } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+      event.preventDefault(); show(index - 1);
+    } else if (event.key === 'Home') { show(0); }
+    else if (event.key === 'End') { show(slides.length - 1); }
+    else if (event.key === 'f' || event.key === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+  });
+
+  deck.addEventListener('click', function (event) {
+    show(index + (event.clientX < window.innerWidth * 0.3 ? -1 : 1));
+  });
+
+  window.addEventListener('resize', fit);
+  fit();
+  show(0);
+})();
+</script>
+</body>
+</html>

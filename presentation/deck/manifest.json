@@ -1,0 +1,28 @@
+{
+  "slides_images": 17,
+  "qr": true,
+  "site": "https://threefast.onrender.com",
+  "files": [
+    "README.md",
+    "analytics.jpg",
+    "cancelled.jpg",
+    "checkout.jpg",
+    "checkoutphone.jpg",
+    "dark.jpg",
+    "home.jpg",
+    "kitchen.jpg",
+    "live.jpg",
+    "manifest.json",
+    "menu.jpg",
+    "menuphone.jpg",
+    "platform.jpg",
+    "poster.jpg",
+    "qr.svg",
+    "scan.jpg",
+    "scancard.jpg",
+    "success.jpg",
+    "threefast.html",
+    "time.jpg",
+    "timephone.jpg"
+  ]
+}
